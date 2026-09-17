@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Simulador Eléctrico Industrial</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+  --border: #30363d; --text: #e6edf3; --text2: #8b949e;
+  --cyan: #00bcd4; --cyan2: #0097a7; --orange: #ff6b35;
+  --red: #f44336; --green: #4caf50; --yellow: #ffc107;
+  --panel-w: 300px; --right-w: 360px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',monospace;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* HEADER */
+#app-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:10}
+#app-header h1{font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:1px;white-space:nowrap}
+#app-header .spacer{flex:1}
+.hbtn{padding:6px 14px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px;transition:.2s}
+.hbtn:hover{background:var(--bg2);border-color:var(--cyan)}
+.hbtn.primary{background:var(--cyan2);border-color:var(--cyan);color:#000;font-weight:700}
+.hbtn.primary:hover{background:var(--cyan)}
+.hbtn.danger{border-color:var(--orange);color:var(--orange)}
+select.hsel{padding:5px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:12px}
+/* MAIN LAYOUT */
+#main-layout{display:flex;flex:1;overflow:hidden}
+/* LEFT PANEL */
+#left-panel{width:var(--panel-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#left-panel .panel-title{padding:8px 12px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border)}
+#tree-container{flex:1;overflow-y:auto;padding:8px}
+#global-params{border-top:1px solid var(--border);padding:10px}
+/* CENTER PANEL */
+#center-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:600px}
+#diagram-container{flex:1;overflow:auto;position:relative;background:var(--bg)}
+#diagram-svg{display:block}
+/* RIGHT PANEL */
+#right-panel{width:var(--right-w);background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#right-panel .panel-title{padding:8px 12px;font-size:11px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border)}
+#inspector-container{flex:1;overflow-y:auto;padding:10px}
+/* BOTTOM PANEL */
+#bottom-panel{height:300px;background:var(--bg2);border-top:2px solid var(--border);flex-shrink:0;display:flex;flex-direction:column}
+#chart-tabs{display:flex;border-bottom:1px solid var(--border)}
+.ctab{padding:7px 16px;cursor:pointer;font-size:12px;color:var(--text2);border-bottom:2px solid transparent;transition:.2s}
+.ctab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+#chart-content{flex:1;overflow:hidden;position:relative}
+.chart-pane{display:none;width:100%;height:100%;padding:8px;position:absolute;top:0;left:0}
+.chart-pane.active{display:flex;gap:8px}
+canvas.chart-canvas{flex:1;max-height:100%}
+/* FORMS */
+.form-group{margin-bottom:10px}
+.form-group label{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);margin-bottom:3px}
+.form-group label .tip{color:var(--cyan2);cursor:help;font-size:10px}
+.form-group input,.form-group select{width:100%;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:12px}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--cyan)}
+.form-group input.warn{border-color:var(--orange)}
+.form-group input.err{border-color:var(--red)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-section{margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.form-section-title{font-size:11px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.btn{padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px;width:100%;margin-top:4px;transition:.2s}
+.btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn.success{background:#1b4332;border-color:var(--green);color:var(--green)}
+.btn.add{border-color:var(--yellow);color:var(--yellow)}
+/* RESULTS */
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.result-item{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:6px 8px}
+.result-item .lbl{font-size:10px;color:var(--text2);margin-bottom:2px}
+.result-item .val{font-size:14px;font-weight:700}
+.val.ok{color:var(--green)}.val.warn{color:var(--yellow)}.val.err{color:var(--red)}.val.cyan{color:var(--cyan)}
+/* ALERTS */
+#alerts-container{padding:6px 10px;max-height:80px;overflow-y:auto}
+.alert{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:3px;margin-bottom:3px;font-size:11px}
+.alert.warning{background:#2d1f00;border-left:3px solid var(--yellow)}
+.alert.error{background:#2d0a0a;border-left:3px solid var(--red)}
+.alert.info{background:#001f2d;border-left:3px solid var(--cyan)}
+/* TREE */
+.tree-node{padding:3px 0;cursor:pointer;user-select:none}
+.tree-node .node-row{display:flex;align-items:center;gap:4px;padding:3px 6px;border-radius:3px;transition:.15s}
+.tree-node .node-row:hover{background:var(--bg3)}
+.tree-node .node-row.selected{background:#003d4d;border-left:2px solid var(--cyan)}
+.tree-node .children{padding-left:16px;border-left:1px solid var(--border);margin-left:8px}
+.node-toggle{color:var(--text2);font-size:10px;width:12px}
+.node-icon{font-size:13px}
+.node-label{flex:1;font-size:12px}
+.node-badge{font-size:10px;padding:1px 5px;border-radius:10px;background:var(--bg3);border:1px solid var(--border)}
+.node-badge.on{border-color:var(--green);color:var(--green)}
+.node-badge.off{border-color:var(--red);color:var(--red)}
+/* GAUGES */
+.gauge-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px}
+.gauge-wrap{text-align:center}
+.gauge-label{font-size:10px;color:var(--text2);margin-top:4px}
+/* POWER TRIANGLE */
+#power-triangle-svg{background:var(--bg3);border:1px solid var(--border);border-radius:4px}
+/* COMPARE */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;height:100%;overflow-y:auto}
+.compare-col{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:8px}
+.compare-col h4{font-size:11px;font-weight:700;margin-bottom:8px;text-align:center;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.compare-col.before h4{color:var(--red)}
+.compare-col.after h4{color:var(--green)}
+.compare-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);font-size:11px}
+.compare-row:last-child{border-bottom:none}
+.delta{font-size:10px;padding:1px 4px;border-radius:2px}
+.delta.good{background:#1b4332;color:var(--green)}.delta.bad{background:#2d0a0a;color:var(--red)}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+/* TOOLTIP */
+[title]{position:relative}
+/* LOAD ITEM */
+.load-item{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:8px;margin-bottom:6px}
+.load-item-header{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.load-item-header .load-type{flex:1;font-size:11px;font-weight:700;color:var(--cyan)}
+.load-item-header .del-btn{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:0 4px}
+/* SVG diagram elements */
+.sv-element{cursor:pointer;transition:.15s}
+.sv-element:hover .sv-hitbox{fill:rgba(0,188,212,.08)}
+.sv-selected .sv-hitbox{fill:rgba(0,188,212,.15);stroke:var(--cyan);stroke-width:1}
+.sv-label{font-family:'Segoe UI',sans-serif;fill:#8b949e;font-size:10px}
+.sv-value{font-family:'Segoe UI',sans-serif;fill:#00bcd4;font-size:10px;font-weight:700}
+.sv-badge{font-family:'Segoe UI',sans-serif;font-size:9px;font-weight:700}
+.wire{stroke:#30363d;stroke-width:2;fill:none}
+.wire-hot{stroke:#00bcd4;stroke-width:2.5;fill:none}
+/* toggle switch */
+.toggle-wrap{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.toggle{position:relative;width:36px;height:18px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg3);border:1px solid var(--border);border-radius:9px;cursor:pointer;transition:.2s}
+.toggle-slider:before{content:'';position:absolute;width:12px;height:12px;left:2px;top:2px;background:var(--text2);border-radius:50%;transition:.2s}
+.toggle input:checked + .toggle-slider{background:var(--cyan2);border-color:var(--cyan)}
+.toggle input:checked + .toggle-slider:before{transform:translateX(18px);background:#000}
+
+/* ═══ TABLET / iPAD RESPONSIVE ═══════════════════════════════════════════ */
+/* Touch targets mínimos 44px en toda la UI */
+.hbtn,.btn,.ctab,.toggle-slider,.node-row{min-height:44px;display:flex;align-items:center;justify-content:center}
+.hbtn,.btn{padding:10px 16px}
+.ctab{padding:10px 18px}
+.node-row{min-height:40px;padding:6px 8px}
+.form-group input,.form-group select{min-height:40px;font-size:14px;padding:8px 10px}
+.toggle{width:48px;height:26px}
+.toggle-slider:before{width:18px;height:18px;left:3px;top:3px}
+.toggle input:checked + .toggle-slider:before{transform:translateX(22px)}
+
+/* Hamburger / close btns */
+#btn-menu-left,#btn-menu-right{display:none;background:none;border:none;color:var(--cyan);font-size:22px;cursor:pointer;padding:4px 10px;min-height:44px;line-height:1}
+#btn-close-left,#btn-close-right{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px;display:none}
+
+/* Overlay backdrop */
+#panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:199;backdrop-filter:blur(2px)}
+#panel-overlay.active{display:block}
+
+/* Bottom nav bar (portrait) */
+#bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:60px;background:var(--bg2);border-top:1px solid var(--border);z-index:300;flex-shrink:0}
+#bottom-nav .bnav-inner{display:flex;height:100%}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:10px;border-top:2px solid transparent;transition:.2s;min-height:60px}
+.bnav-btn .icon{font-size:20px;line-height:1}
+.bnav-btn.active{color:var(--cyan);border-top-color:var(--cyan)}
+
+/* SVG diagram touch-pan container */
+#diagram-container{touch-action:none}
+
+/* Bottom panel resize handle */
+#bottom-resize-handle{height:6px;background:var(--bg3);border-top:1px solid var(--border);cursor:ns-resize;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+#bottom-resize-handle::after{content:'';width:40px;height:3px;background:var(--border);border-radius:2px}
+
+/* ── iPad landscape (≤1180px) — pannels become drawers ── */
+@media (max-width:1180px){
+  :root{--panel-w:290px;--right-w:340px}
+  #btn-menu-left,#btn-menu-right{display:flex}
+  #alerts-container{display:none}
+  /* Left panel drawer */
+  #left-panel{position:fixed;top:0;left:0;bottom:0;z-index:200;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:4px 0 24px rgba(0,0,0,.5)}
+  #left-panel.open{transform:translateX(0)}
+  #left-panel .panel-title{display:flex;align-items:center;justify-content:space-between}
+  #btn-close-left{display:flex}
+  /* Right panel drawer */
+  #right-panel{position:fixed;top:0;right:0;bottom:0;z-index:200;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);box-shadow:-4px 0 24px rgba(0,0,0,.5)}
+  #right-panel.open{transform:translateX(0)}
+  #right-panel .panel-title{display:flex;align-items:center;justify-content:space-between;flex-direction:row-reverse}
+  #btn-close-right{display:flex}
+  /* Center expands to full width */
+  #center-panel{min-width:0}
+  #bottom-panel{height:280px}
+  /* Header compact */
+  #app-header h1{font-size:13px}
+  select.hsel{max-width:160px}
+  .hbtn span.btn-label{display:none}
+}
+
+/* ── iPad portrait (≤834px) — bottom nav, full screen views ── */
+@media (max-width:834px){
+  body{height:100dvh}
+  #bottom-nav{display:block}
+  /* Reserve space for bottom nav */
+  #bottom-panel{margin-bottom:60px}
+  /* Header ultra-compact */
+  #app-header{padding:6px 10px;gap:8px}
+  #app-header h1{font-size:12px;letter-spacing:0}
+  select.hsel{font-size:11px;padding:4px 6px;max-width:130px}
+  .hbtn{padding:8px 10px;font-size:11px}
+  /* Gauges: 2 columns */
+  .gauge-grid{grid-template-columns:repeat(2,1fr)}
+  /* Form rows single col */
+  .form-row{grid-template-columns:1fr}
+  /* Charts smaller text */
+  .ctab{padding:8px 10px;font-size:11px}
+  /* SVG scales to viewport */
+  #diagram-svg{min-width:100%}
+}
+
+/* ── Small portrait fallback (≤480px) ── */
+@media (max-width:480px){
+  #app-header h1{display:none}
+  #bottom-panel{height:220px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="app-header">
+  <button id="btn-menu-left" title="Sistema">☰</button>
+  <h1>⚡ SIMULADOR ELÉCTRICO</h1>
+  <select class="hsel" id="case-selector">
+    <option value="0">Caso 1: Oficinas</option>
+    <option value="1">Caso 2: Industrial</option>
+    <option value="2">Caso 3: Compensación</option>
+  </select>
+  <div class="spacer"></div>
+  <div id="alerts-container" style="flex:1;max-width:400px"></div>
+  <button class="hbtn primary" id="btn-simulate">▶ SIMULAR</button>
+  <button class="hbtn" id="btn-reset" title="Reset">↺ <span class="btn-label">Reset</span></button>
+  <button class="hbtn" id="btn-export-json" title="Exportar JSON">⬇ <span class="btn-label">JSON</span></button>
+  <button class="hbtn danger" id="btn-export-report" title="Informe">📄 <span class="btn-label">Informe</span></button>
+  <button id="btn-menu-right" title="Inspector">⚙</button>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div id="main-layout">
+
+  <!-- LEFT PANEL -->
+  <aside id="left-panel">
+    <div class="panel-title">Sistema Eléctrico <button id="btn-close-left" title="Cerrar">✕</button></div>
+    <div id="tree-container"></div>
+    <div id="global-params">
+      <div class="form-section-title">Parámetros Globales</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Frecuencia <span class="tip" title="Hz de la red">ⓘ</span></label>
+          <select id="g-freq"><option value="60">60 Hz</option><option value="50">50 Hz</option></select>
+        </div>
+        <div class="form-group">
+          <label>Norma</label>
+          <select id="g-norm"><option value="ieee519">IEEE 519</option><option value="iec61000">IEC 61000</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Temp. amb. (°C)</label>
+          <input type="number" id="g-temp" value="25" min="0" max="60">
+        </div>
+        <div class="form-group">
+          <label>V diseño (V)</label>
+          <input type="number" id="g-vnom" value="440" readonly style="color:var(--cyan)">
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER PANEL -->
+  <section id="center-panel">
+    <div id="diagram-container">
+      <svg id="diagram-svg" width="760" height="580"></svg>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL -->
+  <aside id="right-panel">
+    <div class="panel-title" id="right-panel-title">Inspector <button id="btn-close-right" title="Cerrar">✕</button></div>
+    <div id="inspector-container">
+      <div style="color:var(--text2);font-size:12px;text-align:center;padding:40px 20px">
+        Haz clic en un elemento del diagrama para editar sus parámetros
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /main-layout -->
+
+<!-- PANEL OVERLAY (backdrop para drawers en tablet) -->
+<div id="panel-overlay"></div>
+
+<!-- BOTTOM PANEL -->
+<div id="bottom-panel">
+<div id="bottom-resize-handle" title="Arrastrar para redimensionar"></div>
+  <div id="chart-tabs">
+    <div class="ctab active" data-tab="waveform">Formas de Onda</div>
+    <div class="ctab" data-tab="harmonics">Espectro Armónico</div>
+    <div class="ctab" data-tab="powers">Potencias y FP</div>
+    <div class="ctab" data-tab="compare">Antes / Después</div>
+  </div>
+  <div id="chart-content">
+    <div class="chart-pane active" id="pane-waveform">
+      <canvas class="chart-canvas" id="chart-waveform"></canvas>
+      <div style="width:100px;font-size:11px;padding:4px">
+        <div style="margin-bottom:8px;font-weight:700;color:var(--text2)">Señales</div>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-va" checked> <span style="color:#f44336">Va</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-vb" checked> <span style="color:#ffc107">Vb</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-vc" checked> <span style="color:#3f51b5">Vc</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-ia" checked> <span style="color:#ff6b35">Ia</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-ib" checked> <span style="color:#4caf50">Ib</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-ic" checked> <span style="color:#00bcd4">Ic</span></label>
+        <label style="display:flex;gap:4px;align-items:center;margin:3px 0"><input type="checkbox" id="chk-in"> <span style="color:#9c27b0">In</span></label>
+      </div>
+    </div>
+    <div class="chart-pane" id="pane-harmonics">
+      <canvas class="chart-canvas" id="chart-harmonics"></canvas>
+    </div>
+    <div class="chart-pane" id="pane-powers" style="flex-direction:column">
+      <div class="gauge-grid" id="gauge-grid" style="flex-shrink:0"></div>
+      <div style="display:flex;gap:8px;flex:1;padding:0 8px 8px">
+        <div style="flex:1">
+          <table style="width:100%;font-size:11px;border-collapse:collapse" id="power-table">
+            <thead><tr style="color:var(--text2)"><th>Magnitud</th><th>Valor</th><th>Unidad</th></tr></thead>
+            <tbody id="power-tbody"></tbody>
+          </table>
+        </div>
+        <svg id="power-triangle-svg" width="180" height="160" viewBox="0 0 180 160"></svg>
+      </div>
+    </div>
+    <div class="chart-pane" id="pane-compare">
+      <div style="display:flex;flex-direction:column;width:100%;height:100%;overflow:auto">
+        <div style="display:flex;gap:8px;padding:6px 8px;flex-shrink:0">
+          <div class="form-group" style="flex:1;margin:0">
+            <label>Punto de medición</label>
+            <select id="cmp-point" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-size:11px"></select>
+          </div>
+          <div class="form-group" style="flex:1;margin:0">
+            <label>Equipo compensación</label>
+            <select id="cmp-device" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-size:11px"></select>
+          </div>
+        </div>
+        <div id="compare-body" style="display:flex;gap:8px;padding:0 8px 8px;flex:1;overflow:hidden">
+          <div class="compare-col before" style="flex:1"><h4>⛔ SIN COMPENSACIÓN</h4><div id="compare-before"></div></div>
+          <div style="width:200px"><canvas id="chart-compare-harmonics" style="max-height:240px"></canvas></div>
+          <div class="compare-col after" style="flex:1"><h4>✅ CON COMPENSACIÓN</h4><div id="compare-after"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV BAR (portrait/mobile) -->
+<nav id="bottom-nav">
+  <div class="bnav-inner">
+    <button class="bnav-btn" data-view="left"><span class="icon">🌲</span>Sistema</button>
+    <button class="bnav-btn active" data-view="diagram"><span class="icon">📐</span>Diagrama</button>
+    <button class="bnav-btn" data-view="right"><span class="icon">⚙️</span>Inspector</button>
+    <button class="bnav-btn" data-view="charts"><span class="icon">📊</span>Gráficas</button>
+  </div>
+</nav>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ ENGINE ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+const LOAD_PROFILES = {
+  resistive:  { pf:1.00, thdi:0,   h:[1,0,0,0,0,0,0,0,0,0,0,0,0] },
+  inductive:  { pf:0.82, thdi:5,   h:[1,.02,.03,.02,0,.01,.01,0,0,0,0,0,0] },
+  motor_direct:{ pf:0.82, thdi:5,  h:[1,.02,.03,.02,0,.01,.01,0,0,0,0,0,0] },
+  motor_vfd:  { pf:0.88, thdi:38,  h:[1,.05,.30,.14,0,.09,.06,0,.03,.02,0,0,0] },
+  elevator:   { pf:0.82, thdi:42,  h:[1,.04,.35,.16,0,.10,.06,0,.05,.03,0,0,0] },
+  led_a:      { pf:0.95, thdi:15,  h:[1,.12,.08,.05,0,.03,.02,.01,0,0,0,0,0] },
+  led_b:      { pf:0.75, thdi:35,  h:[1,.28,.18,.10,0,.06,.04,.02,0,0,0,0,0] },
+  led_eco:    { pf:0.60, thdi:80,  h:[1,.65,.40,.20,0,.12,.08,0,.06,.04,0,0,0] },
+  computer:   { pf:0.68, thdi:110, h:[1,.85,.55,.28,0,.16,.10,0,.07,.04,.03,0,0] },
+  ups:        { pf:0.95, thdi:28,  h:[1,.03,.22,.11,0,.07,.04,0,.03,.02,0,0,0] },
+  custom:     { pf:0.85, thdi:10,  h:[1,.05,.05,.03,0,.02,.01,0,0,0,0,0,0] }
+};
+
+const LOAD_LABELS = {
+  resistive:'Resistiva/Calefacción', inductive:'Inductiva RL',
+  motor_direct:'Motor Directo', motor_vfd:'Motor con VFD',
+  elevator:'Ascensor (VFD)', led_a:'LED Clase A', led_b:'LED Clase B',
+  led_eco:'LED Económico', computer:'Cómputo/Electrónica',
+  ups:'UPS Doble Conversión', custom:'Carga Personalizada'
+};
+
+class Transformer {
+  constructor(p={}) {
+    this.primaryV  = p.primaryV  ?? 13.2;  // kV
+    this.secondaryV= p.secondaryV?? 440;   // V
+    this.kVA       = p.kVA       ?? 300;
+    this.Z         = p.Z         ?? 4.0;   // %
+    this.R         = p.R         ?? 1.0;   // %
+    this.group     = p.group     ?? 'Dyn11';
+    this.noLoadW   = p.noLoadW   ?? 800;
+    this.loadW     = p.loadW     ?? 3500;
+    this.Zpu = this.Z / 100;
+    this.Rpu = this.R / 100;
+    this.Xpu = Math.sqrt(Math.max(0, this.Zpu**2 - this.Rpu**2));
+  }
+  get Irated() { return (this.kVA*1000)/(Math.sqrt(3)*this.secondaryV); }
+  getSecondaryVoltage(S_kVA, pf) {
+    const Ipu = S_kVA / this.kVA;
+    const phi = Math.acos(Math.min(1,Math.max(0,pf)));
+    const dV  = Ipu*(this.Rpu*pf + this.Xpu*Math.sin(phi));
+    return this.secondaryV * (1-dV);
+  }
+  getPrimaryCurrents(S_kVA) { return (S_kVA*1000)/(Math.sqrt(3)*this.primaryV*1000); }
+  getShortCircuitMVA() { return this.kVA/1000 / this.Zpu; }
+}
+
+class Load {
+  constructor(p={}) {
+    this.name    = p.name    ?? 'Carga';
+    this.type    = p.type    ?? 'resistive';
+    this.kW      = p.kW      ?? 5;
+    this.phases  = p.phases  ?? 3;
+    this.units   = p.units   ?? 1;
+    this.enabled = p.enabled ?? true;
+    // overrides
+    this.pfOverride  = p.pfOverride  ?? null;
+    this.thdiOverride= p.thdiOverride?? null;
+    this.hOverride   = p.hOverride   ?? null;
+  }
+  get profile() { return LOAD_PROFILES[this.type]||LOAD_PROFILES.custom; }
+  get pf()   { return this.pfOverride  ?? this.profile.pf; }
+  get thdi() { return this.thdiOverride?? this.profile.thdi; }
+  get harmonics() { return this.hOverride ?? this.profile.h; }
+  get P()    { return this.kW * this.units; }
+  get Q()    { return this.P * Math.tan(Math.acos(Math.min(1,this.pf))); }
+  get I1()   {
+    const V = window.SYS?.transformer?.secondaryV ?? 440;
+    const den = this.phases===3 ? Math.sqrt(3)*V : (this.phases===2?2*V:V);
+    return (this.P*1000)/(den*this.pf);
+  }
+}
+
+class Panel {
+  constructor(p={}) {
+    this.id      = p.id      ?? ('pan_'+Math.random().toString(36).slice(2,6));
+    this.name    = p.name    ?? 'Salida';
+    this.type    = p.type    ?? 'empty'; // '3F','1F','2F','capacitor','svg','apf','empty'
+    this.enabled = p.enabled ?? true;
+    this.breaker = p.breaker ?? 200;     // A
+    this.feedLen = p.feedLen ?? 20;      // m
+    this.loads   = (p.loads||[]).map(l=>new Load(l));
+    // compensation params
+    this.compType  = p.compType  ?? null; // 'bc','svg_dev','apf'
+    this.compParams= p.compParams?? {};
+  }
+  get P() { return this.loads.filter(l=>l.enabled).reduce((s,l)=>s+l.P,0); }
+  get Q() { return this.loads.filter(l=>l.enabled).reduce((s,l)=>s+l.Q,0); }
+  get S() { return Math.sqrt(this.P**2+this.Q**2)||0.001; }
+  get pf(){ return this.P/this.S; }
+  get harmonics() {
+    const H = new Array(13).fill(0);
+    const loads = this.loads.filter(l=>l.enabled);
+    if(!loads.length) return H;
+    loads.forEach(l=>{
+      const I1=l.I1; const lh=l.harmonics;
+      lh.forEach((mag,n)=>{ H[n]=Math.sqrt((H[n]||0)**2+(mag*I1)**2); });
+    });
+    return H;
+  }
+  get thdi() {
+    const H=this.harmonics, I1=H[0]||1;
+    const dist=Math.sqrt(H.slice(2).reduce((s,v)=>s+v**2,0));
+    return (dist/I1)*100;
+  }
+  get I1_total() {
+    const V=window.SYS?.transformer?.secondaryV??440;
+    return (this.P*1000)/(Math.sqrt(3)*V*(this.pf||1));
+  }
+}
+
+class SimulationEngine {
+  constructor(sys) { this.sys=sys; this.f=sys.freq; this.results={}; }
+
+  run() {
+    const tr=this.sys.transformer;
+    const panels=this.sys.panels.filter(p=>p.enabled && p.type!=='empty');
+    // Bus totals
+    let P=0,Q=0;
+    const busH=new Array(13).fill(0);
+    panels.forEach(pan=>{
+      if(pan.type==='capacitor'||pan.type==='svg_dev'||pan.type==='apf') return;
+      P+=pan.P; Q+=pan.Q;
+      pan.harmonics.forEach((v,n)=>{ busH[n]=Math.sqrt(busH[n]**2+v**2); });
+    });
+    // Compensation effects
+    let Q_comp=0, hReduction=new Array(13).fill(1);
+    panels.forEach(pan=>{
+      if(!pan.enabled) return;
+      if(pan.type==='capacitor') { Q_comp+=pan.compParams.kvar??0; }
+      if(pan.type==='svg_dev')   { const target=pan.compParams.pfTarget??0.95; Q_comp=Math.max(Q_comp, P*Math.tan(Math.acos(target))-Q+Q_comp); }
+      if(pan.type==='apf') {
+        const eff=(pan.compParams.efficiency??92)/100;
+        const toFilter=pan.compParams.harmonics??[2,4,6,8,10,12];
+        toFilter.forEach(n=>{ if(n<hReduction.length) hReduction[n]=1-eff; });
+        if(pan.compParams.mode==='combined') Q_comp+=pan.compParams.kvar??0;
+      }
+    });
+    // Q_net signed: positive = inductive (LAG), negative = capacitive (LEAD)
+    // Do NOT clamp — a BC with no load still draws capacitive current from the transformer
+    const Q_net = Q - Q_comp;
+    const S_net = Math.sqrt(P**2 + Q_net**2) || 0.001;
+    const pf_net = P / S_net;                          // magnitude 0–1 (for calculations)
+    const Q_lead = Q_net < 0;                          // true when overcompensated or BC-only
+    const pf_signed = Q_lead ? -pf_net : pf_net;      // signed: + LAG (ind), - LEAD (cap)
+    const Vs=tr.getSecondaryVoltage(S_net, pf_net);
+    const loading=(S_net/tr.kVA)*100;
+    const Irated=tr.Irated;
+    const I_bus=(S_net*1000)/(Math.sqrt(3)*Vs);
+    // Compensated harmonics
+    const busH_comp=busH.map((v,n)=>v*hReduction[n]);
+    const I1=busH[0]||1, I1c=busH_comp[0]||1;
+    const thdi=Math.sqrt(busH.slice(2).reduce((s,v)=>s+v**2,0))/I1*100;
+    const thdi_c=Math.sqrt(busH_comp.slice(2).reduce((s,v)=>s+v**2,0))/I1c*100;
+    // THD-V: proportional to THD-I * Z (simplified)
+    const thdv=thdi*this.sys.transformer.Zpu*0.6;
+    const thdv_c=thdi_c*this.sys.transformer.Zpu*0.6;
+    // Unbalance: simulate small random unbalance unless loads are unbalanced
+    const unbalV=Math.min(5, 0.5+panels.filter(p=>p.type==='1F'||p.type==='2F').length*0.4);
+    const unbalI=Math.min(15, unbalV*2.5);
+    // Neutral current from zero-sequence (triple-n) harmonics: In = 3×√(Ih3²+Ih9²)
+    // In a balanced 3F system triple-n harmonics add in the neutral instead of cancelling
+    const In    = 3*Math.sqrt((busH[2]||0)**2 + (busH[8]||0)**2) * Math.sqrt(2);
+    const In_comp= 3*Math.sqrt((busH_comp[2]||0)**2 + (busH_comp[8]||0)**2) * Math.sqrt(2);
+    // Fraction of In due to triple-n (for diagnostic detail)
+    const In_tripleN_pct = I_bus>0 ? (In/I_bus*100) : 0;
+    // Resonance check for BC
+    let resonanceRisk=false, fr=0;
+    panels.forEach(pan=>{
+      if(pan.type==='capacitor' && pan.enabled) {
+        const kvar=pan.compParams.kvar??0;
+        if(kvar>0) { fr=this.f*Math.sqrt(tr.getShortCircuitMVA()*1000/kvar); resonanceRisk=(fr>200&&fr<700); }
+      }
+    });
+    const losses_kW=(P*(this.sys.transformer.Rpu*(S_net/tr.kVA)**2)+tr.noLoadW/1000);
+    this.results = {
+      P, Q, Q_net, Q_lead, S:S_net, pf:pf_net, pf_signed, Vs, loading, I_bus, Irated,
+      harmonics:busH, harmonics_comp:busH_comp, thdi, thdi_c, thdv, thdv_c,
+      unbalV, unbalI, In, In_comp, In_tripleN_pct, resonanceRisk, fr, losses_kW,
+      Q_comp, hReduction,
+      hasComp: Q_comp>0||hReduction.some(v=>v<1)
+    };
+    return this.results;
+  }
+
+  generateWaveform(r) {
+    const N=512, cycles=3, f=this.f;
+    const Vpk=Math.sqrt(2)*(r.Vs||440);
+    // phi signed: positive = current lags (inductive/LAG), negative = current leads (capacitive/LEAD)
+    const phiMag = Math.acos(Math.min(1, r.pf));
+    const phi = r.Q_lead ? -phiMag : phiMag;
+
+    // Original harmonics (for voltage distortion reference)
+    const H  = r.harmonics;
+    const I1  = H[0] || 1;
+
+    // Compensated harmonics → current waveform reflects APF filtering
+    // If no APF active, harmonics_comp === harmonics (no change)
+    const Hc  = (r.harmonics_comp && r.harmonics_comp[0] > 0) ? r.harmonics_comp : H;
+    const I1c = Hc[0] > 0.01 ? Hc[0] : (r.I_bus > 0.1 ? r.I_bus : 0.5);
+
+    // FIX: peak of the FUNDAMENTAL only — harmonics are added separately (no double-counting)
+    const Ipk = Math.sqrt(2) * I1c;
+
+    const t=[]; const Va=[],Vb=[],Vc=[],Ia=[],Ib=[],Ic=[],In=[];
+    for(let i=0;i<N;i++){
+      const ti=i/(N*f/cycles);
+      t.push(ti*1000);
+      // Voltage: fundamental + small distortion proportional to THD-V
+      let va=Vpk*Math.sin(2*Math.PI*f*ti), vb=Vpk*Math.sin(2*Math.PI*f*ti-2*Math.PI/3), vc=Vpk*Math.sin(2*Math.PI*f*ti+2*Math.PI/3);
+      H.forEach((ih,n)=>{ if(n<2)return; const a=ih/I1*(r.thdv||0)/100*Vpk*0.3; va+=a*Math.sin(n*2*Math.PI*f*ti); vb+=a*Math.sin(n*(2*Math.PI*f*ti-2*Math.PI/3)); vc+=a*Math.sin(n*(2*Math.PI*f*ti+2*Math.PI/3)); });
+      // Current: ONLY fundamental as base, then add COMPENSATED harmonics (no double-count)
+      let ia=Ipk*Math.sin(2*Math.PI*f*ti-phi), ib=Ipk*Math.sin(2*Math.PI*f*ti-phi-2*Math.PI/3), ic=Ipk*Math.sin(2*Math.PI*f*ti-phi+2*Math.PI/3);
+      Hc.forEach((ih,n)=>{ if(n<2)return; const phasesh=n%3===0?0:n*Math.PI/6; ia+=Math.sqrt(2)*ih*Math.sin(n*2*Math.PI*f*ti+phasesh); ib+=Math.sqrt(2)*ih*Math.sin(n*(2*Math.PI*f*ti-2*Math.PI/3)+phasesh); ic+=Math.sqrt(2)*ih*Math.sin(n*(2*Math.PI*f*ti+2*Math.PI/3)+phasesh); });
+      Va.push(va);Vb.push(vb);Vc.push(vc);Ia.push(ia);Ib.push(ib);Ic.push(ic);In.push(ia+ib+ic);
+    }
+    return {t,Va,Vb,Vc,Ia,Ib,Ic,In};
+  }
+
+  runDiagnostics(r) {
+    const alerts=[];
+    const norm=window.SYS?.norm||'ieee519';
+    const thdi_lim=norm==='ieee519'?5:16, thdv_lim=norm==='ieee519'?5:8;
+    if(r.thdi>thdi_lim) alerts.push({level:'warning',msg:`THD-I = ${r.thdi.toFixed(1)}% supera límite (${thdi_lim}%)`});
+    if(r.thdv>thdv_lim) alerts.push({level:'error',msg:`THD-V = ${r.thdv.toFixed(2)}% supera límite (${thdv_lim}%)`});
+    if(r.pf<0.9)   alerts.push({level:'warning',msg:`FP = ${r.pf_signed>=0?'+':''}${r.pf_signed.toFixed(3)} ${r.Q_lead?'LEAD':'LAG'} — bajo límite (0.90)`});
+    if(r.unbalV>2) alerts.push({level:'warning',msg:`Desbalance V = ${r.unbalV.toFixed(1)}% > 2% (NEMA)`});
+    if(r.In>r.I_bus*0.7) alerts.push({level:'error',msg:`Neutro excesivo: ${r.In.toFixed(1)} A (${r.In_tripleN_pct.toFixed(0)}% Ifase) — h3+h9 en neutro. Requiere APF`});
+    if(r.loading>90) alerts.push({level:'warning',msg:`Transformador al ${r.loading.toFixed(0)}% de carga`});
+    if(r.resonanceRisk) alerts.push({level:'error',msg:`⚠️ RESONANCIA: BC en ${r.fr.toFixed(0)} Hz`});
+    return alerts;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ STATE ════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CASES = [
+  { name:'Edificio de Oficinas',
+    transformer:{primaryV:13.2,secondaryV:440,kVA:300,Z:4,R:1,group:'Dyn11',noLoadW:800,loadW:3500},
+    panels:[
+      {name:'Tablero Piso 1',type:'3F',breaker:200,feedLen:30,enabled:true,loads:[
+        {name:'Computadores',type:'computer',kW:8,units:1,enabled:true},
+        {name:'Iluminación LED',type:'led_b',kW:2.5,units:1,enabled:true}]},
+      {name:'HVAC',type:'3F',breaker:150,feedLen:25,enabled:true,loads:[
+        {name:'Aire Acondicionado',type:'motor_vfd',kW:15,units:1,enabled:true},
+        {name:'Ventilación',type:'motor_vfd',kW:7.5,units:1,enabled:true}]},
+      {name:'Ascensor',type:'3F',breaker:100,feedLen:40,enabled:true,loads:[
+        {name:'Motor Ascensor',type:'elevator',kW:22,units:1,enabled:true}]},
+      {name:'UPS Servidores',type:'3F',breaker:100,feedLen:20,enabled:true,loads:[
+        {name:'UPS Rack',type:'ups',kW:12,units:1,enabled:true}]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]}
+    ]},
+  { name:'Sistema Industrial',
+    transformer:{primaryV:13.2,secondaryV:440,kVA:750,Z:5,R:1.2,group:'Dyn11',noLoadW:1500,loadW:7500},
+    panels:[
+      {name:'Tablero Prod 1',type:'3F',breaker:400,feedLen:50,enabled:true,loads:[
+        {name:'Motor Banda',type:'motor_vfd',kW:55,units:1,enabled:true},
+        {name:'Motor Bomba',type:'motor_vfd',kW:30,units:2,enabled:true}]},
+      {name:'Tablero Prod 2',type:'3F',breaker:300,feedLen:60,enabled:true,loads:[
+        {name:'Motor Compresor',type:'motor_direct',kW:45,units:1,enabled:true},
+        {name:'Resistencias',type:'resistive',kW:20,units:1,enabled:true}]},
+      {name:'Oficinas',type:'3F',breaker:100,feedLen:80,enabled:true,loads:[
+        {name:'Cómputo',type:'computer',kW:5,units:1,enabled:true},
+        {name:'LED',type:'led_a',kW:1.5,units:1,enabled:true}]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]}
+    ]},
+  { name:'Con Compensación Completa',
+    transformer:{primaryV:13.2,secondaryV:440,kVA:500,Z:4,R:1,group:'Dyn11',noLoadW:1000,loadW:5000},
+    panels:[
+      {name:'Tablero Oficinas',type:'3F',breaker:200,feedLen:30,enabled:true,loads:[
+        {name:'Computadores',type:'computer',kW:15,units:1,enabled:true},
+        {name:'LED',type:'led_eco',kW:3,units:1,enabled:true}]},
+      {name:'HVAC+Ascensor',type:'3F',breaker:200,feedLen:40,enabled:true,loads:[
+        {name:'Motor VFD',type:'motor_vfd',kW:22,units:1,enabled:true},
+        {name:'Ascensor',type:'elevator',kW:15,units:1,enabled:true}]},
+      {name:'Banco Cond.',type:'capacitor',breaker:100,feedLen:5,enabled:true,loads:[],compType:'bc',compParams:{kvar:60,steps:6,reactor:true,pfFactor:7}},
+      {name:'Filtro APF',type:'apf',breaker:150,feedLen:5,enabled:true,loads:[],compType:'apf',compParams:{ampRated:100,mode:'combined',harmonics:[2,4,6,8,10,12],efficiency:92,kvar:20}},
+      {name:'UPS',type:'3F',breaker:100,feedLen:20,enabled:true,loads:[
+        {name:'UPS Servidores',type:'ups',kW:8,units:1,enabled:true}]},
+      {name:'VACÍO',type:'empty',breaker:63,feedLen:10,enabled:false,loads:[]}
+    ]}
+];
+
+window.SYS = {
+  transformer: null, panels: [], freq:60, norm:'ieee519', tempAmb:25,
+  selectedEl: null, results: null, engine: null
+};
+
+function loadCase(idx) {
+  const c=CASES[idx];
+  SYS.transformer=new Transformer(c.transformer);
+  SYS.panels=c.panels.map(p=>new Panel(p));
+  SYS.selectedEl=null;
+  document.getElementById('g-vnom').value=SYS.transformer.secondaryV;
+  renderTree(); drawDiagram(); clearInspector();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ DIAGRAM (D3) ═════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SVG_DEFS = {
+  transformer: (g,x,y)=>{
+    g.append('line').attrs({x1:x,y1:y-40,x2:x,y2:y-18}).classed('wire',true);
+    g.append('circle').attrs({cx:x,cy:y-12,r:12,fill:'none',stroke:'#8b949e','stroke-width':2});
+    g.append('circle').attrs({cx:x,cy:y+4, r:12,fill:'none',stroke:'#8b949e','stroke-width':2});
+    g.append('text').attrs({x:x+18,y:y-16,fill:'#8b949e','font-size':9,'text-anchor':'start'}).text('HV');
+    g.append('text').attrs({x:x+18,y:y+8, fill:'#8b949e','font-size':9,'text-anchor':'start'}).text('LV');
+    g.append('line').attrs({x1:x,y1:y+16,x2:x,y2:y+36}).classed('wire',true);
+  },
+  breaker:(g,x,y,on)=>{
+    const c=on?'#4caf50':'#f44336';
+    g.append('rect').attrs({x:x-8,y:y-12,width:16,height:24,fill:'none',stroke:c,'stroke-width':1.5,rx:2});
+    g.append('line').attrs({x1:x,y1:y-12,x2:x+(on?0:6),y2:y+(on?12:-4),stroke:c,'stroke-width':1.5});
+  },
+  capacitor:(g,x,y)=>{
+    g.append('line').attrs({x1:x,y1:y-8,x2:x,y2:y+8,stroke:'#ffc107','stroke-width':2});
+    g.append('line').attrs({x1:x-12,y1:y-8,x2:x+12,y2:y-8,stroke:'#ffc107','stroke-width':2.5});
+    g.append('line').attrs({x1:x-12,y1:y+8,x2:x+12,y2:y+8,stroke:'#ffc107','stroke-width':2.5});
+    g.append('text').attrs({x,y:y+22,'text-anchor':'middle',fill:'#ffc107','font-size':9}).text('BC');
+  },
+  apf:(g,x,y)=>{
+    g.append('rect').attrs({x:x-14,y:y-12,width:28,height:24,fill:'#001a2d',stroke:'#00bcd4','stroke-width':1.5,rx:3});
+    g.append('text').attrs({x,y:y+4,'text-anchor':'middle',fill:'#00bcd4','font-size':9,'font-weight':'bold'}).text('APF');
+  },
+  svg_dev:(g,x,y)=>{
+    g.append('rect').attrs({x:x-14,y:y-12,width:28,height:24,fill:'#001a2d',stroke:'#9c27b0','stroke-width':1.5,rx:3});
+    g.append('text').attrs({x,y:y+4,'text-anchor':'middle',fill:'#9c27b0','font-size':9,'font-weight':'bold'}).text('SVG');
+  },
+  panel3F:(g,x,y)=>{
+    g.append('rect').attrs({x:x-14,y:y-12,width:28,height:24,fill:'#1a2d1a',stroke:'#4caf50','stroke-width':1,rx:2});
+    g.append('text').attrs({x,y:y+4,'text-anchor':'middle',fill:'#4caf50','font-size':9}).text('3F');
+  },
+  panel1F:(g,x,y)=>{
+    g.append('rect').attrs({x:x-14,y:y-12,width:28,height:24,fill:'#1a1a2d',stroke:'#2196f3','stroke-width':1,rx:2});
+    g.append('text').attrs({x,y:y+4,'text-anchor':'middle',fill:'#2196f3','font-size':9}).text('1F');
+  },
+  empty:(g,x,y)=>{
+    g.append('rect').attrs({x:x-14,y:y-10,width:28,height:20,fill:'none',stroke:'#30363d','stroke-width':1,rx:2,'stroke-dasharray':'4,2'});
+    g.append('text').attrs({x,y:y+4,'text-anchor':'middle',fill:'#30363d','font-size':9}).text('—');
+  }
+};
+// d3 selection .attrs helper
+d3.selection.prototype.attrs=function(o){Object.entries(o).forEach(([k,v])=>this.attr(k,v));return this;};
+
+function drawDiagram() {
+  const svg=d3.select('#diagram-svg');
+  svg.selectAll('*').remove();
+  const W=760, H=580;
+  const cx=W/2, trY=120, busY=230, outY=370, labelY=460;
+  const slots=6, slotW=W/(slots+1);
+  const slotX=i=>slotW*(i+1);
+
+  // Background grid
+  svg.append('rect').attrs({width:W,height:H,fill:getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()});
+  for(let x=0;x<W;x+=40) svg.append('line').attrs({x1:x,y1:0,x2:x,y2:H,stroke:'#161b22','stroke-width':.5});
+  for(let y=0;y<H;y+=40) svg.append('line').attrs({x1:0,y1:y,x2:W,y2:y,stroke:'#161b22','stroke-width':.5});
+
+  // ─── MT line ───
+  svg.append('line').attrs({x1:cx,y1:20,x2:cx,y2:trY-40,stroke:'#f44336','stroke-width':3});
+  svg.append('text').attrs({x:cx+8,y:35,fill:'#f44336','font-size':10,'font-weight':'bold'}).text(SYS.transformer.primaryV+' kV MT');
+  svg.append('text').attrs({x:cx+8,y:50,fill:'#8b949e','font-size':9}).text('Acometida');
+
+  // ─── Transformer ───
+  const trG=svg.append('g').attr('class','sv-element').attr('id','el-transformer');
+  trG.append('rect').attrs({x:cx-50,y:trY-45,width:100,height:110,fill:'rgba(0,0,0,0)',stroke:'none'}).attr('class','sv-hitbox');
+  SVG_DEFS.transformer(trG,cx,trY);
+  // TR labels
+  const tr=SYS.transformer;
+  trG.append('text').attrs({x:cx-55,y:trY-5,fill:'#e6edf3','font-size':11,'text-anchor':'end','font-weight':'bold'}).text('TR-1');
+  trG.append('text').attrs({x:cx-55,y:trY+10,fill:'#8b949e','font-size':9,'text-anchor':'end'}).text(tr.kVA+' kVA');
+  trG.append('text').attrs({x:cx-55,y:trY+22,fill:'#8b949e','font-size':9,'text-anchor':'end'}).text('Z='+tr.Z+'%');
+  // Result badge
+  if(SYS.results) {
+    const l=SYS.results.loading;
+    const lc=l>90?'#f44336':l>70?'#ffc107':'#4caf50';
+    const pfs=SYS.results.pf_signed, pfLead=SYS.results.Q_lead;
+    const pfColor=pfLead?'#00bcd4':pfs>=0.95?'#4caf50':pfs>=0.85?'#ffc107':'#f44336';
+    const pfTxt=(pfs>=0?'+':'')+pfs.toFixed(3)+' '+(pfLead?'LEAD':'LAG');
+    trG.append('rect').attrs({x:cx+55,y:trY-10,width:68,height:42,fill:'#161b22',stroke:lc,'stroke-width':1,rx:3});
+    trG.append('text').attrs({x:cx+57,y:trY+2, fill:lc,        'font-size':9}).text(`${l.toFixed(0)}% carg`);
+    trG.append('text').attrs({x:cx+57,y:trY+14,fill:'#00bcd4', 'font-size':9}).text(`${SYS.results.Vs.toFixed(0)} V`);
+    trG.append('text').attrs({x:cx+57,y:trY+26,fill:pfColor,   'font-size':9,'font-weight':'bold'}).text(`FP ${pfTxt}`);
+  }
+  trG.on('click',()=>selectElement('transformer'));
+
+  // ─── Busbar ───
+  svg.append('line').attrs({x1:cx,y1:trY+36,x2:cx,y2:busY,stroke:'#30363d','stroke-width':2});
+  const busBar=svg.append('rect').attrs({x:60,y:busY,width:W-120,height:8,fill:'#00bcd4',rx:2});
+  svg.append('text').attrs({x:62,y:busY-5,fill:'#00bcd4','font-size':10,'font-weight':'bold'}).text('BARRAJE PRINCIPAL '+tr.secondaryV+' V');
+  if(SYS.results) {
+    const r=SYS.results;
+    const qLabel=r.Q_lead ? `Q=${r.Q_net.toFixed(1)} kVAR ⚡LEAD` : `Q=${r.Q_net.toFixed(1)} kVAR LAG`;
+    const pfLabel=`FP=${r.pf_signed>=0?'+':''}${r.pf_signed.toFixed(3)} ${r.Q_lead?'LEAD':'LAG'}`;
+    svg.append('text').attrs({x:62,y:busY+20,fill:'#8b949e','font-size':9})
+      .text(`${r.I_bus.toFixed(1)} A  |  P=${r.P.toFixed(1)} kW  ${qLabel}  ${pfLabel}  Carg=${r.loading.toFixed(0)}%`);
+  }
+  busBar.on('click',()=>selectElement('busbar'));
+
+  // ─── Outputs ───
+  SYS.panels.forEach((pan,i)=>{
+    const x=slotX(i), isSel=(SYS.selectedEl==='panel_'+i);
+    const g=svg.append('g').attr('class','sv-element'+(isSel?' sv-selected':'')).attr('id','el-panel-'+i);
+    g.append('rect').attrs({x:x-35,y:busY+8,width:70,height:labelY-busY-8,fill:'rgba(0,0,0,0)',stroke:'none',class:'sv-hitbox',rx:2});
+    // feed line
+    const lineColor=pan.enabled&&pan.type!=='empty'?'#30363d':'#1e2530';
+    g.append('line').attrs({x1:x,y1:busY+8,x2:x,y2:outY-30,stroke:lineColor,'stroke-width':2});
+    // breaker
+    SVG_DEFS.breaker(g,x,outY-30,pan.enabled);
+    // feed line 2
+    g.append('line').attrs({x1:x,y1:outY-18,x2:x,y2:outY-14,stroke:lineColor,'stroke-width':2});
+    // device symbol
+    const drawFn=SVG_DEFS[pan.type]||SVG_DEFS.empty;
+    drawFn(g,x,outY);
+    // LED indicator
+    const ledColor=pan.enabled&&pan.type!=='empty'?'#4caf50':'#f44336';
+    g.append('circle').attrs({cx:x+20,cy:busY+18,r:5,fill:ledColor,opacity:.8});
+    // Breaker label
+    g.append('text').attrs({x,y:outY-44,'text-anchor':'middle',fill:'#8b949e','font-size':9}).text(pan.breaker+'A');
+    // Name
+    const nW=60, nlines=pan.name.match(/.{1,8}/g)||[pan.name];
+    nlines.slice(0,2).forEach((ln,j)=>{
+      g.append('text').attrs({x,y:labelY+j*13,'text-anchor':'middle',fill:pan.enabled&&pan.type!=='empty'?'#e6edf3':'#30363d','font-size':10,'font-weight':isSel?'bold':'normal'}).text(ln);
+    });
+    // Result values
+    if(SYS.results && pan.enabled && pan.type!=='empty' && pan.type!=='capacitor'&&pan.type!=='apf'&&pan.type!=='svg_dev') {
+      const pW=pan.P, pPf=pan.pf;
+      g.append('text').attrs({x,y:outY+26,'text-anchor':'middle',fill:'#00bcd4','font-size':9}).text(`${pW.toFixed(1)}kW`);
+      const pfC=pPf<0.85?'#ffc107':pPf<0.7?'#f44336':'#8b949e';
+      g.append('text').attrs({x,y:outY+38,'text-anchor':'middle',fill:pfC,'font-size':9}).text(`FP ${pPf.toFixed(2)}`);
+    }
+    if(SYS.results && (pan.type==='capacitor'||pan.type==='apf'||pan.type==='svg_dev')) {
+      g.append('text').attrs({x,y:outY+26,'text-anchor':'middle',fill:'#ffc107','font-size':9}).text('ACTIVO');
+    }
+    g.on('click',()=>selectElement('panel_'+i));
+  });
+
+  // Selection highlight
+  const sel=SYS.selectedEl;
+  if(sel==='transformer') svg.select('#el-transformer').select('.sv-hitbox').attr('fill','rgba(0,188,212,.12)').attr('stroke','#00bcd4').attr('stroke-width',1);
+  if(sel==='busbar') busBar.attr('stroke','#fff').attr('stroke-width',2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ UI ═══════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+function selectElement(id) {
+  SYS.selectedEl=id;
+  drawDiagram();
+  renderInspector(id);
+}
+
+function clearInspector() {
+  document.getElementById('right-panel-title').textContent='Inspector';
+  document.getElementById('inspector-container').innerHTML='<div style="color:var(--text2);font-size:12px;text-align:center;padding:40px 20px">Haz clic en un elemento del diagrama para editar sus parámetros</div>';
+}
+
+function renderInspector(id) {
+  const c=document.getElementById('inspector-container');
+  const title=document.getElementById('right-panel-title');
+  if(id==='transformer') { title.textContent='Transformador'; c.innerHTML=buildTransformerForm(); attachTransformerEvents(); }
+  else if(id==='busbar')  { title.textContent='Barraje Principal'; c.innerHTML=buildBusbarInfo(); }
+  else if(id&&id.startsWith('panel_')) {
+    const i=parseInt(id.split('_')[1]);
+    const pan=SYS.panels[i];
+    title.textContent=`Salida ${i+1}: ${pan.name}`;
+    c.innerHTML=buildPanelForm(pan,i);
+    attachPanelEvents(pan,i);
+  }
+  // Show results if simulated
+  if(SYS.results) appendResultsBlock(id);
+}
+
+function buildTransformerForm() {
+  const tr=SYS.transformer;
+  return `<div class="form-section">
+  <div class="form-section-title">Transformador TR-1</div>
+  <div class="form-row">
+    <div class="form-group"><label>Tensión primaria <span class="tip" title="Tensión de la acometida en kV">ⓘ</span></label>
+      <select id="f-primaryV"><option ${tr.primaryV==120?'selected':''} value="120">120 kV</option><option ${tr.primaryV==34.5?'selected':''} value="34.5">34.5 kV</option><option ${tr.primaryV==13.2?'selected':''} value="13.2">13.2 kV</option><option ${tr.primaryV==11.4?'selected':''} value="11.4">11.4 kV</option></select></div>
+    <div class="form-group"><label>Tensión secundaria <span class="tip" title="Tensión en el barraje">ⓘ</span></label>
+      <select id="f-secondaryV"><option ${tr.secondaryV==220?'selected':''} value="220">220 V</option><option ${tr.secondaryV==380?'selected':''} value="380">380 V</option><option ${tr.secondaryV==440?'selected':''} value="440">440 V</option><option ${tr.secondaryV==480?'selected':''} value="480">480 V</option></select></div>
+  </div>
+  <div class="form-group"><label>Potencia nominal (kVA) <span class="tip" title="Capacidad nominal del transformador">ⓘ</span></label>
+    <select id="f-kVA">${[45,75,112.5,150,225,300,500,750,1000,1500,2000].map(v=>`<option ${tr.kVA==v?'selected':''} value="${v}">${v} kVA</option>`).join('')}</select></div>
+  <div class="form-row">
+    <div class="form-group"><label>Impedancia (%) <span class="tip" title="Impedancia de cortocircuito del transformador">ⓘ</span></label>
+      <input type="number" id="f-Z" value="${tr.Z}" min="1.5" max="6" step="0.1"></div>
+    <div class="form-group"><label>Resistencia (%)</label>
+      <input type="number" id="f-R" value="${tr.R}" min="0.5" max="2" step="0.1"></div>
+  </div>
+  <div class="form-group"><label>Grupo de conexión</label>
+    <select id="f-group"><option ${tr.group=='Dyn11'?'selected':''}>Dyn11</option><option ${tr.group=='Yyn0'?'selected':''}>Yyn0</option><option ${tr.group=='Dyn1'?'selected':''}>Dyn1</option><option ${tr.group=='Yzn11'?'selected':''}>Yzn11</option></select></div>
+  <div class="form-row">
+    <div class="form-group"><label>Pérd. vacío (W)</label>
+      <input type="number" id="f-noLoadW" value="${tr.noLoadW}" min="0"></div>
+    <div class="form-group"><label>Pérd. carga (W)</label>
+      <input type="number" id="f-loadW" value="${tr.loadW}" min="0"></div>
+  </div>
+  <button class="btn success" id="btn-update-tr">✔ Actualizar Transformador</button>
+</div>`;
+}
+
+function attachTransformerEvents() {
+  document.getElementById('btn-update-tr').addEventListener('click',()=>{
+    SYS.transformer.primaryV  =parseFloat(document.getElementById('f-primaryV').value);
+    SYS.transformer.secondaryV=parseFloat(document.getElementById('f-secondaryV').value);
+    SYS.transformer.kVA       =parseFloat(document.getElementById('f-kVA').value);
+    SYS.transformer.Z         =parseFloat(document.getElementById('f-Z').value);
+    SYS.transformer.R         =parseFloat(document.getElementById('f-R').value);
+    SYS.transformer.group     =document.getElementById('f-group').value;
+    SYS.transformer.noLoadW   =parseFloat(document.getElementById('f-noLoadW').value);
+    SYS.transformer.loadW     =parseFloat(document.getElementById('f-loadW').value);
+    SYS.transformer.Zpu=SYS.transformer.Z/100;
+    SYS.transformer.Rpu=SYS.transformer.R/100;
+    SYS.transformer.Xpu=Math.sqrt(Math.max(0,SYS.transformer.Zpu**2-SYS.transformer.Rpu**2));
+    document.getElementById('g-vnom').value=SYS.transformer.secondaryV;
+    drawDiagram(); simulate();
+  });
+}
+
+function buildBusbarInfo() {
+  const tr=SYS.transformer;
+  return `<div class="form-section">
+  <div class="form-section-title">Barraje Principal</div>
+  <div class="result-grid">
+    <div class="result-item"><div class="lbl">Tensión nominal</div><div class="val cyan">${tr.secondaryV} V</div></div>
+    <div class="result-item"><div class="lbl">Sistema</div><div class="val">3F+N+T</div></div>
+    <div class="result-item"><div class="lbl">Icc (kA)</div><div class="val cyan">${((tr.kVA/tr.Z)*100/Math.sqrt(3)/tr.secondaryV).toFixed(1)} kA</div></div>
+    <div class="result-item"><div class="lbl">Scc (MVA)</div><div class="val cyan">${tr.getShortCircuitMVA().toFixed(2)}</div></div>
+  </div>
+  ${SYS.results?`<div class="result-grid">
+    <div class="result-item"><div class="lbl">P total</div><div class="val cyan">${SYS.results.P.toFixed(1)} kW</div></div>
+    <div class="result-item"><div class="lbl">Q total</div><div class="val warn">${SYS.results.Q.toFixed(1)} kVAR</div></div>
+    <div class="result-item"><div class="lbl">S total</div><div class="val">${SYS.results.S.toFixed(1)} kVA</div></div>
+    <div class="result-item"><div class="lbl">FP bus</div><div class="val ${SYS.results.pf>=0.9?'ok':SYS.results.pf>=0.85?'warn':'err'}" style="color:${SYS.results.Q_lead?'#00bcd4':'inherit'}">${SYS.results.pf_signed>=0?'+':''}${SYS.results.pf_signed.toFixed(3)} <span style="font-size:9px">${SYS.results.Q_lead?'⚡LEAD':'LAG'}</span></div></div>
+    <div class="result-item"><div class="lbl">I bus (A)</div><div class="val cyan">${SYS.results.I_bus.toFixed(1)} A</div></div>
+    <div class="result-item"><div class="lbl">Cargabilidad</div><div class="val ${SYS.results.loading>90?'err':SYS.results.loading>70?'warn':'ok'}">${SYS.results.loading.toFixed(1)}%</div></div>
+    <div class="result-item"><div class="lbl">THD-I</div><div class="val ${SYS.results.thdi>5?'err':'ok'}">${SYS.results.thdi.toFixed(1)}%</div></div>
+    <div class="result-item"><div class="lbl">THD-V</div><div class="val ${SYS.results.thdv>5?'err':'ok'}">${SYS.results.thdv.toFixed(2)}%</div></div>
+  </div>`:'<p style="color:var(--text2);font-size:11px;margin-top:8px">Simula para ver resultados</p>'}`;
+}
+
+function buildPanelForm(pan, idx) {
+  const typeOpts=['3F','2F','1F','capacitor','svg_dev','apf','empty'];
+  const typeLabels={'3F':'Tablero Trifásico','2F':'Tablero Bifásico','1F':'Tablero Monofásico','capacitor':'Banco Condensadores','svg_dev':'SVG - Static Var','apf':'APF - Filtro Activo','empty':'Vacío'};
+  let html=`<div class="form-section">
+  <div class="form-section-title">Configuración Salida ${idx+1}</div>
+  <div class="toggle-wrap">
+    <label class="toggle"><input type="checkbox" id="f-en-${idx}" ${pan.enabled?'checked':''}><span class="toggle-slider"></span></label>
+    <span>Habilitado</span>
+  </div>
+  <div class="form-group"><label>Nombre</label><input type="text" id="f-name-${idx}" value="${pan.name}"></div>
+  <div class="form-row">
+    <div class="form-group"><label>Tipo</label>
+      <select id="f-type-${idx}">${typeOpts.map(t=>`<option value="${t}"${pan.type===t?' selected':''}>${typeLabels[t]}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Interruptor (A)</label>
+      <select id="f-breaker-${idx}">${[15,20,30,40,63,80,100,125,150,175,200,250,300,400,500,630,800,1000,1250,1600].map(a=>`<option${pan.breaker===a?' selected':''} value="${a}">${a}A</option>`).join('')}</select></div>
+  </div>
+  <div class="form-group"><label>Long. alimentador (m)</label><input type="number" id="f-feed-${idx}" value="${pan.feedLen}" min="1" max="500"></div>
+  <button class="btn success" id="btn-upd-pan-${idx}">✔ Actualizar Salida</button>
+</div>`;
+
+  // Loads section for normal panels
+  if(pan.type==='3F'||pan.type==='2F'||pan.type==='1F') {
+    html+=`<div class="form-section">
+    <div class="form-section-title">Cargas del Tablero</div>
+    <div id="loads-list-${idx}">${pan.loads.map((l,li)=>buildLoadItem(l,idx,li)).join('')}</div>
+    <button class="btn add" id="btn-add-load-${idx}">+ Agregar Carga</button></div>`;
+  }
+  // Compensation sections
+  if(pan.type==='capacitor') html+=buildBCForm(pan,idx);
+  if(pan.type==='svg_dev')   html+=buildSVGForm(pan,idx);
+  if(pan.type==='apf')       html+=buildAPFForm(pan,idx);
+
+  return html;
+}
+
+function buildLoadItem(l, panIdx, loadIdx) {
+  const typeOpts=Object.entries(LOAD_LABELS).map(([k,v])=>`<option value="${k}"${l.type===k?' selected':''}>${v}</option>`).join('');
+  return `<div class="load-item" id="load-item-${panIdx}-${loadIdx}">
+  <div class="load-item-header">
+    <span class="load-type">${LOAD_LABELS[l.type]||l.type}</span>
+    <button class="del-btn" onclick="deleteLoad(${panIdx},${loadIdx})">✕</button>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Tipo</label><select class="l-type" data-pan="${panIdx}" data-load="${loadIdx}">${typeOpts}</select></div>
+    <div class="form-group"><label>Fases</label><select class="l-phases" data-pan="${panIdx}" data-load="${loadIdx}">
+      <option value="3"${l.phases==3?' selected':''}>3F</option><option value="1"${l.phases==1?' selected':''}>1F</option><option value="2"${l.phases==2?' selected':''}>2F</option></select></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Potencia (kW)</label><input type="number" class="l-kw" data-pan="${panIdx}" data-load="${loadIdx}" value="${l.kW}" min="0.1" step="0.1"></div>
+    <div class="form-group"><label>Unidades</label><input type="number" class="l-units" data-pan="${panIdx}" data-load="${loadIdx}" value="${l.units}" min="1"></div>
+  </div>
+  <div style="font-size:10px;color:var(--text2)">FP=${LOAD_PROFILES[l.type]?.pf??l.pf} THD-I=${LOAD_PROFILES[l.type]?.thdi??l.thdi}%</div>
+</div>`;
+}
+
+function buildBCForm(pan,idx) {
+  const p=pan.compParams;
+  return `<div class="form-section">
+  <div class="form-section-title">Banco de Condensadores</div>
+  <div class="form-row">
+    <div class="form-group"><label>Potencia (kVAR) <span class="tip" title="Reactiva a compensar">ⓘ</span></label>
+      <input type="number" id="bc-kvar-${idx}" value="${p.kvar??50}" min="5" max="2000"></div>
+    <div class="form-group"><label>Pasos</label>
+      <input type="number" id="bc-steps-${idx}" value="${p.steps??6}" min="1" max="12"></div>
+  </div>
+  <div class="toggle-wrap"><label class="toggle"><input type="checkbox" id="bc-reactor-${idx}" ${p.reactor?'checked':''}><span class="toggle-slider"></span></label><span>Reactor desintonización</span></div>
+  <div class="form-group"><label>Factor p (%)</label>
+    <select id="bc-pfactor-${idx}"><option ${p.pfFactor==5.67?'selected':''} value="5.67">5.67%</option><option ${p.pfFactor==7?'selected':''} value="7">7%</option><option ${p.pfFactor==14?'selected':''} value="14">14%</option></select></div>
+  ${SYS.results&&SYS.results.fr>0?`<div style="background:var(--bg3);padding:6px;border-radius:4px;font-size:11px;margin-top:8px">
+    <span>fr = ${SYS.results.fr.toFixed(0)} Hz</span> ${SYS.results.resonanceRisk?'<span style="color:var(--red)">⚠️ RESONANCIA</span>':'<span style="color:var(--green)">✓ OK</span>'}
+  </div>`:''}
+  <button class="btn success" id="btn-upd-bc-${idx}">✔ Actualizar BC</button>
+</div>`;
+}
+
+function buildSVGForm(pan,idx) {
+  const p=pan.compParams;
+  return `<div class="form-section">
+  <div class="form-section-title">SVG - Static Var Generator</div>
+  <div class="form-row">
+    <div class="form-group"><label>Potencia (kVAR)</label>
+      <input type="number" id="svg-kvar-${idx}" value="${p.kvar??100}" min="50" max="2000"></div>
+    <div class="form-group"><label>FP objetivo</label>
+      <input type="number" id="svg-pf-${idx}" value="${p.pfTarget??0.95}" min="0.9" max="1" step="0.01"></div>
+  </div>
+  <div class="form-group"><label>T. respuesta (ms)</label>
+    <input type="number" id="svg-tr-${idx}" value="${p.responseMs??20}" min="10" max="50"></div>
+  <button class="btn success" id="btn-upd-svg-${idx}">✔ Actualizar SVG</button>
+</div>`;
+}
+
+function buildAPFForm(pan,idx) {
+  const p=pan.compParams;
+  const harms=[{n:3,i:2},{n:5,i:4},{n:7,i:6},{n:9,i:8},{n:11,i:10},{n:13,i:12}];
+  return `<div class="form-section">
+  <div class="form-section-title">APF - Filtro Activo de Potencia</div>
+  <div class="form-row">
+    <div class="form-group"><label>Corriente nominal (A)</label>
+      <select id="apf-amp-${idx}">${[30,50,75,100,150,200,300,400,600].map(a=>`<option${p.ampRated===a?' selected':''} value="${a}">${a}A</option>`).join('')}</select></div>
+    <div class="form-group"><label>Modo</label>
+      <select id="apf-mode-${idx}">
+        <option value="harmonics"${p.mode==='harmonics'?' selected':''}>Solo armónicos</option>
+        <option value="reactive"${p.mode==='reactive'?' selected':''}>Solo reactiva</option>
+        <option value="combined"${p.mode==='combined'?' selected':''}>Combinado</option>
+      </select></div>
+  </div>
+  <div class="form-group"><label>Eficiencia filtrado (%)</label>
+    <input type="number" id="apf-eff-${idx}" value="${p.efficiency??92}" min="85" max="97"></div>
+  <div class="form-group"><label>Armónicos a filtrar</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+    ${harms.map(h=>`<label style="display:flex;gap:3px;align-items:center;font-size:11px"><input type="checkbox" class="apf-harm-${idx}" value="${h.i}" ${(p.harmonics??[2,4,6,8,10,12]).includes(h.i)?'checked':''}> h${h.n}</label>`).join('')}
+    </div></div>
+  <div class="form-group"><label>kVAR compensación (si combinado)</label>
+    <input type="number" id="apf-kvar-${idx}" value="${p.kvar??0}" min="0" max="500"></div>
+  <button class="btn success" id="btn-upd-apf-${idx}">✔ Actualizar APF</button>
+</div>`;
+}
+
+function attachPanelEvents(pan, idx) {
+  // Toggle enable
+  const enEl=document.getElementById(`f-en-${idx}`);
+  if(enEl) enEl.addEventListener('change',e=>{pan.enabled=e.target.checked;drawDiagram();simulate();});
+  // Type change → re-render
+  const typeEl=document.getElementById(`f-type-${idx}`);
+  if(typeEl) typeEl.addEventListener('change',e=>{
+    pan.type=e.target.value;
+    if(['capacitor','svg_dev','apf'].includes(pan.type)) pan.loads=[];
+    // Initialize compParams with defaults so simulation runs immediately with sensible values
+    if(pan.type==='capacitor' && !pan.compParams.kvar)
+      pan.compParams={kvar:50, steps:6, reactor:false, pfFactor:7};
+    if(pan.type==='svg_dev' && !pan.compParams.pfTarget)
+      pan.compParams={kvar:100, pfTarget:0.95, responseMs:20};
+    if(pan.type==='apf' && !pan.compParams.mode)
+      pan.compParams={ampRated:100, mode:'combined', harmonics:[2,4,6,8,10,12], efficiency:92, kvar:0};
+    document.getElementById('right-panel-title').textContent=`Salida ${idx+1}: ${pan.name}`;
+    document.getElementById('inspector-container').innerHTML=buildPanelForm(pan,idx);
+    attachPanelEvents(pan,idx);
+    simulate();
+  });
+  // Update button
+  const updBtn=document.getElementById(`btn-upd-pan-${idx}`);
+  if(updBtn) updBtn.addEventListener('click',()=>{
+    pan.name   =document.getElementById(`f-name-${idx}`).value;
+    pan.type   =document.getElementById(`f-type-${idx}`).value;
+    pan.breaker=parseInt(document.getElementById(`f-breaker-${idx}`).value);
+    pan.feedLen=parseInt(document.getElementById(`f-feed-${idx}`).value);
+    pan.enabled=document.getElementById(`f-en-${idx}`).checked;
+    document.getElementById('right-panel-title').textContent=`Salida ${idx+1}: ${pan.name}`;
+    drawDiagram(); simulate();
+  });
+  // Load events
+  document.querySelectorAll(`.l-type[data-pan="${idx}"]`).forEach(el=>el.addEventListener('change',e=>{
+    const li=parseInt(e.target.dataset.load);
+    pan.loads[li].type=e.target.value;
+    document.getElementById('inspector-container').innerHTML=buildPanelForm(pan,idx);
+    attachPanelEvents(pan,idx);
+  }));
+  document.querySelectorAll(`.l-kw[data-pan="${idx}"]`).forEach(el=>el.addEventListener('change',e=>{pan.loads[parseInt(e.target.dataset.load)].kW=parseFloat(e.target.value)||0;simulate();}));
+  document.querySelectorAll(`.l-units[data-pan="${idx}"]`).forEach(el=>el.addEventListener('change',e=>{pan.loads[parseInt(e.target.dataset.load)].units=parseInt(e.target.value)||1;simulate();}));
+  document.querySelectorAll(`.l-phases[data-pan="${idx}"]`).forEach(el=>el.addEventListener('change',e=>{pan.loads[parseInt(e.target.dataset.load)].phases=parseInt(e.target.value);simulate();}));
+  // Add load
+  const addBtn=document.getElementById(`btn-add-load-${idx}`);
+  if(addBtn) addBtn.addEventListener('click',()=>{
+    pan.loads.push(new Load({name:'Nueva Carga',type:'resistive',kW:5,units:1,enabled:true}));
+    document.getElementById('inspector-container').innerHTML=buildPanelForm(pan,idx);
+    attachPanelEvents(pan,idx);
+  });
+  // BC update
+  const bcBtn=document.getElementById(`btn-upd-bc-${idx}`);
+  if(bcBtn) bcBtn.addEventListener('click',()=>{
+    pan.compParams.kvar=parseFloat(document.getElementById(`bc-kvar-${idx}`).value);
+    pan.compParams.steps=parseInt(document.getElementById(`bc-steps-${idx}`).value);
+    pan.compParams.reactor=document.getElementById(`bc-reactor-${idx}`).checked;
+    pan.compParams.pfFactor=parseFloat(document.getElementById(`bc-pfactor-${idx}`).value);
+    simulate();
+  });
+  // SVG update
+  const svgBtn=document.getElementById(`btn-upd-svg-${idx}`);
+  if(svgBtn) svgBtn.addEventListener('click',()=>{
+    pan.compParams.kvar=parseFloat(document.getElementById(`svg-kvar-${idx}`).value);
+    pan.compParams.pfTarget=parseFloat(document.getElementById(`svg-pf-${idx}`).value);
+    simulate();
+  });
+  // APF update
+  const apfBtn=document.getElementById(`btn-upd-apf-${idx}`);
+  if(apfBtn) apfBtn.addEventListener('click',()=>{
+    pan.compParams.ampRated=parseInt(document.getElementById(`apf-amp-${idx}`).value);
+    pan.compParams.mode=document.getElementById(`apf-mode-${idx}`).value;
+    pan.compParams.efficiency=parseFloat(document.getElementById(`apf-eff-${idx}`).value);
+    pan.compParams.kvar=parseFloat(document.getElementById(`apf-kvar-${idx}`).value)||0;
+    pan.compParams.harmonics=[...document.querySelectorAll(`.apf-harm-${idx}:checked`)].map(e=>parseInt(e.value));
+    simulate();
+  });
+}
+
+window.deleteLoad = function(panIdx, loadIdx) {
+  SYS.panels[panIdx].loads.splice(loadIdx,1);
+  document.getElementById('inspector-container').innerHTML=buildPanelForm(SYS.panels[panIdx],panIdx);
+  attachPanelEvents(SYS.panels[panIdx],panIdx);
+  simulate();
+};
+
+function appendResultsBlock(id) {
+  const r=SYS.results;
+  if(!r) return;
+  const c=document.getElementById('inspector-container');
+  // Already shown in busbar form. For panels add basic results.
+  if(id&&id.startsWith('panel_')) {
+    const i=parseInt(id.split('_')[1]);
+    const pan=SYS.panels[i];
+    if(pan.type==='3F'||pan.type==='2F'||pan.type==='1F') {
+      const div=document.createElement('div');
+      div.innerHTML=`<div class="form-section"><div class="form-section-title">Resultados Medidos</div>
+      <div class="result-grid">
+        <div class="result-item"><div class="lbl">P activa</div><div class="val cyan">${pan.P.toFixed(1)} kW</div></div>
+        <div class="result-item"><div class="lbl">Q reactiva</div><div class="val warn">${pan.Q.toFixed(1)} kVAR</div></div>
+        <div class="result-item"><div class="lbl">FP</div><div class="val ${pan.pf>=0.9?'ok':pan.pf>=0.85?'warn':'err'}">${pan.pf.toFixed(3)} LAG</div></div>
+        <div class="result-item"><div class="lbl">THD-I</div><div class="val ${pan.thdi>5?'err':'ok'}">${pan.thdi.toFixed(1)}%</div></div>
+        <div class="result-item"><div class="lbl">I1 (A)</div><div class="val cyan">${pan.I1_total.toFixed(1)} A</div></div>
+        <div class="result-item"><div class="lbl">S aparente</div><div class="val">${pan.S.toFixed(1)} kVA</div></div>
+      </div></div>`;
+      c.appendChild(div);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ CHARTS ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+let charts={waveform:null, harmonics:null, powers:null, compare:null};
+
+Chart.defaults.color='#8b949e';
+Chart.defaults.borderColor='#30363d';
+Chart.defaults.font.family='Segoe UI, monospace';
+Chart.defaults.font.size=11;
+
+function initCharts() {
+  // Waveform
+  charts.waveform=new Chart(document.getElementById('chart-waveform'),{
+    type:'line',
+    data:{labels:[],datasets:[
+      {label:'Va',data:[],borderColor:'#f44336',borderWidth:1.5,pointRadius:0,yAxisID:'y',hidden:false},
+      {label:'Vb',data:[],borderColor:'#ffc107',borderWidth:1.5,pointRadius:0,yAxisID:'y',hidden:false},
+      {label:'Vc',data:[],borderColor:'#3f51b5',borderWidth:1.5,pointRadius:0,yAxisID:'y',hidden:false},
+      {label:'Ia',data:[],borderColor:'#ff6b35',borderWidth:1.5,pointRadius:0,yAxisID:'y2',hidden:false},
+      {label:'Ib',data:[],borderColor:'#4caf50',borderWidth:1.5,pointRadius:0,yAxisID:'y2',hidden:false},
+      {label:'Ic',data:[],borderColor:'#00bcd4',borderWidth:1.5,pointRadius:0,yAxisID:'y2',hidden:false},
+      {label:'In',data:[],borderColor:'#9c27b0',borderWidth:1.5,pointRadius:0,yAxisID:'y2',hidden:true},
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,
+      scales:{
+        x:{title:{display:true,text:'Tiempo (ms)'},ticks:{maxTicksLimit:10}},
+        y:{title:{display:true,text:'Voltaje (V)'},position:'left'},
+        y2:{title:{display:true,text:'Corriente (A)'},position:'right',grid:{drawOnChartArea:false}}
+      },
+      plugins:{legend:{labels:{boxWidth:12,padding:8}}}}
+  });
+  // Harmonics
+  charts.harmonics=new Chart(document.getElementById('chart-harmonics'),{
+    type:'bar',
+    data:{labels:['h1','h3','h5','h7','h9','h11','h13'],datasets:[
+      {label:'THD-I (%)',data:[],backgroundColor:'rgba(0,188,212,.7)',borderColor:'#00bcd4',borderWidth:1},
+      {label:'Límite IEEE 519',data:[],type:'line',borderColor:'#ff6b35',borderWidth:2,pointRadius:0,fill:false}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,
+      scales:{x:{title:{display:true,text:'Armónico'}},y:{title:{display:true,text:'% del fundamental'},beginAtZero:true}},
+      plugins:{legend:{labels:{boxWidth:12}}}}
+  });
+  // Compare harmonics
+  charts.compare=new Chart(document.getElementById('chart-compare-harmonics'),{
+    type:'bar',
+    data:{labels:['h1','h3','h5','h7','h9','h11','h13'],datasets:[
+      {label:'Antes',data:[],backgroundColor:'rgba(244,67,54,.7)',borderColor:'#f44336',borderWidth:1},
+      {label:'Después',data:[],backgroundColor:'rgba(76,175,80,.7)',borderColor:'#4caf50',borderWidth:1}
+    ]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,
+      scales:{x:{},y:{beginAtZero:true,title:{display:true,text:'%'}}},
+      plugins:{legend:{labels:{boxWidth:10,font:{size:10}}}}}
+  });
+}
+
+function updateCharts(r) {
+  const eng=SYS.engine;
+  const wv=eng.generateWaveform(r);
+  const chk=id=>document.getElementById(id)?.checked;
+  // Waveform
+  const wc=charts.waveform;
+  wc.data.labels=wv.t.filter((_,i)=>i%4===0).map(v=>v.toFixed(1));
+  const ds=wc.data.datasets;
+  const sub=arr=>arr.filter((_,i)=>i%4===0);
+  ds[0].data=sub(wv.Va); ds[0].hidden=!chk('chk-va');
+  ds[1].data=sub(wv.Vb); ds[1].hidden=!chk('chk-vb');
+  ds[2].data=sub(wv.Vc); ds[2].hidden=!chk('chk-vc');
+  ds[3].data=sub(wv.Ia); ds[3].hidden=!chk('chk-ia');
+  ds[4].data=sub(wv.Ib); ds[4].hidden=!chk('chk-ib');
+  ds[5].data=sub(wv.Ic); ds[5].hidden=!chk('chk-ic');
+  ds[6].data=sub(wv.In); ds[6].hidden=!chk('chk-in');
+  wc.update('none');
+  // Harmonics
+  const H=r.harmonics, I1=H[0]||1;
+  const Hpct=[0,2,4,6,8,10,12].map(n=>(H[n]/I1*100));
+  const lim=SYS.norm==='ieee519'?[100,5,4,4,2,2,1.5]:[100,16,16,10,6,5,4];
+  charts.harmonics.data.datasets[0].data=Hpct;
+  charts.harmonics.data.datasets[0].backgroundColor=Hpct.map((v,i)=>v>lim[i]?'rgba(244,67,54,.7)':'rgba(0,188,212,.7)');
+  charts.harmonics.data.datasets[1].data=lim;
+  charts.harmonics.update('none');
+  // Gauges + Power table
+  renderGauges(r);
+  renderPowerTable(r);
+  renderPowerTriangle(r);
+  // Compare
+  updateCompare(r);
+}
+
+function renderGauges(r) {
+  const gg=document.getElementById('gauge-grid');
+  const gauges=[
+    {label:'Factor de Potencia',val:r.pf_signed,min:-1,max:1,fmt:v=>(v>=0?'+':'')+v.toFixed(3),zones:[{from:-1,to:-.85,c:'#00bcd4'},{from:-.85,to:-.5,c:'#7b1fa2'},{from:-.5,to:.85,c:'#f44336'},{from:.85,to:.95,c:'#ffc107'},{from:.95,to:1,c:'#4caf50'}]},
+    {label:'Cargabilidad Trafo',val:r.loading,min:0,max:150,fmt:v=>v.toFixed(0)+'%',zones:[{from:0,to:70,c:'#4caf50'},{from:70,to:90,c:'#ffc107'},{from:90,to:150,c:'#f44336'}]},
+    {label:'Desbalance V (%)',val:r.unbalV,min:0,max:10,fmt:v=>v.toFixed(1)+'%',zones:[{from:0,to:2,c:'#4caf50'},{from:2,to:5,c:'#ffc107'},{from:5,to:10,c:'#f44336'}]},
+    {label:'In / In nom (%)',val:(r.In/r.Irated*100),min:0,max:200,fmt:v=>v.toFixed(0)+'%',zones:[{from:0,to:50,c:'#4caf50'},{from:50,to:80,c:'#ffc107'},{from:80,to:200,c:'#f44336'}]}
+  ];
+  gg.innerHTML=gauges.map((g,i)=>`<div class="gauge-wrap"><svg width="100" height="70" viewBox="0 0 100 70">${buildGaugeSVG(g)}</svg><div class="gauge-label">${g.label}</div></div>`).join('');
+}
+
+function buildGaugeSVG(g) {
+  const W=100,H=70,cx=50,cy=60,r=42,sw=10;
+  const pct=(Math.min(g.max,Math.max(g.min,g.val))-g.min)/(g.max-g.min);
+  const startA=Math.PI,endA=2*Math.PI;
+  const arc=(a0,a1,color)=>{
+    const x1=cx+r*Math.cos(a0),y1=cy+r*Math.sin(a0),x2=cx+r*Math.cos(a1),y2=cy+r*Math.sin(a1);
+    const laf=a1-a0>Math.PI?1:0;
+    return `<path d="M${x1},${y1}A${r},${r},0,${laf},1,${x2},${y2}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
+  };
+  let svgStr='';
+  // Background arc
+  svgStr+=arc(Math.PI,2*Math.PI,'#21262d');
+  // Colored zones
+  g.zones.forEach(z=>{
+    const a0=Math.PI+((z.from-g.min)/(g.max-g.min))*Math.PI;
+    const a1=Math.PI+((z.to  -g.min)/(g.max-g.min))*Math.PI;
+    svgStr+=arc(a0,a1,z.c+'44');
+  });
+  // Value arc
+  const valA=Math.PI+pct*Math.PI;
+  const activeColor=g.zones.find(z=>g.val>=z.from&&g.val<=z.to)?.c||'#00bcd4';
+  svgStr+=arc(Math.PI,valA,activeColor);
+  // Needle
+  const nx=cx+r*0.75*Math.cos(valA), ny=cy+r*0.75*Math.sin(valA);
+  svgStr+=`<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="white" stroke-width="2" stroke-linecap="round"/>`;
+  svgStr+=`<circle cx="${cx}" cy="${cy}" r="4" fill="${activeColor}"/>`;
+  svgStr+=`<text x="${cx}" y="${cy-16}" text-anchor="middle" fill="${activeColor}" font-size="12" font-weight="bold" font-family="monospace">${g.fmt(g.val)}</text>`;
+  return svgStr;
+}
+
+function renderPowerTable(r) {
+  const rows=[
+    ['P activa','cyan',r.P.toFixed(2),'kW'],
+    ['Q reactiva','warn',r.Q.toFixed(2),'kVAR'],
+    ['Q comp.','ok',r.Q_comp?.toFixed(2)||'0.00','kVAR'],
+    ['Q neta','',r.Q_net?.toFixed(2)||r.Q.toFixed(2),'kVAR'],
+    ['S aparente','',r.S.toFixed(2),'kVA'],
+    ['FP total',r.pf>=0.9?'ok':r.pf>=0.85?'warn':'err', (r.pf_signed>=0?'+':'')+r.pf_signed.toFixed(4)+' '+(r.Q_lead?'⚡LEAD':'LAG'),''],
+    ['THD-I',r.thdi>5?'err':'ok',r.thdi.toFixed(2),'%'],
+    ['THD-V',r.thdv>5?'err':'ok',r.thdv.toFixed(3),'%'],
+    ['I bus','cyan',r.I_bus.toFixed(1),'A'],
+    ['I neutro',r.In>r.I_bus*0.7?'err':'ok',r.In.toFixed(1),'A'],
+    ['Pérdidas','warn',r.losses_kW?.toFixed(2)||'—','kW'],
+  ];
+  document.getElementById('power-tbody').innerHTML=rows.map(([l,cl,v,u])=>
+    `<tr><td style="color:var(--text2);padding:2px 4px">${l}</td><td style="padding:2px 4px"><span class="val ${cl}" style="font-size:12px">${v}</span></td><td style="color:var(--text2);padding:2px 4px">${u}</td></tr>`
+  ).join('');
+}
+
+function renderPowerTriangle(r) {
+  const svg=d3.select('#power-triangle-svg');
+  svg.selectAll('*').remove();
+  const W=180,H=160,pad=20;
+  const P=r.P, Q=r.Q_net, S=Math.sqrt(P**2+Q**2);   // Q_net signed
+  const absQ=Math.abs(Q), isLead=Q<0;
+  const scaleX=P>0.1?(W-2*pad)/P:(W-2*pad)/10;
+  const scaleY=absQ>0.1?(H-2*pad)/absQ:(H-2*pad)/10;
+  const scale=Math.min(scaleX,scaleY);
+  // origin in middle-left if capacitive, bottom-left if inductive
+  const ox=pad, oy=isLead?pad+20:H-pad;
+  const px=ox+P*scale, py=oy;
+  // Q draws downward when inductive (oy-Q*scale), upward when capacitive (oy+absQ*scale)
+  const qx=px, qy=isLead?oy+absQ*scale:oy-absQ*scale;
+  const Qcolor=isLead?'#00bcd4':'#ffc107';
+  const Qlabel=isLead?`Q=${Q.toFixed(1)} kVAR ⚡LEAD`:`Q=${Q.toFixed(1)} kVAR LAG`;
+  svg.append('line').attrs({x1:ox,y1:oy,x2:px,y2:py,stroke:'#4caf50','stroke-width':2});
+  svg.append('text').attrs({x:(ox+px)/2,y:oy+(isLead?-6:14),'text-anchor':'middle',fill:'#4caf50','font-size':10}).text(`P=${P.toFixed(1)}kW`);
+  svg.append('line').attrs({x1:px,y1:py,x2:qx,y2:qy,stroke:Qcolor,'stroke-width':2});
+  svg.append('text').attrs({x:px+4,y:(py+qy)/2,fill:Qcolor,'font-size':9}).text(Qlabel);
+  svg.append('line').attrs({x1:ox,y1:oy,x2:qx,y2:qy,stroke:'#8b949e','stroke-width':2,'stroke-dasharray':'4,2'});
+  svg.append('text').attrs({x:(ox+qx)/2-14,y:(oy+qy)/2,fill:'#8b949e','font-size':9}).text(`S=${S.toFixed(1)}kVA`);
+  const phi=Math.atan2(absQ,P);
+  svg.append('text').attrs({x:ox+4,y:oy+(isLead?14:-4),fill:isLead?'#00bcd4':'#e6edf3','font-size':10,'font-weight':'bold'}).text(`FP=${r.pf_signed>=0?'+':''}${r.pf_signed.toFixed(3)}`);
+  svg.append('text').attrs({x:ox+50,y:oy+(isLead?14:-4),fill:Qcolor,'font-size':9}).text(`φ=${(phi*180/Math.PI).toFixed(1)}° ${isLead?'LEAD':'LAG'}`);
+}
+
+function updateCompare(r) {
+  // Populate dropdowns
+  const pointSel=document.getElementById('cmp-point');
+  const devSel=document.getElementById('cmp-device');
+  const points=['Bus Principal',...SYS.panels.filter(p=>p.enabled&&p.type!=='empty').map(p=>p.name)];
+  pointSel.innerHTML=points.map(n=>`<option>${n}</option>`).join('');
+  const compPans=SYS.panels.filter(p=>p.enabled&&['capacitor','svg_dev','apf'].includes(p.type));
+  devSel.innerHTML=(compPans.length?compPans.map(p=>`<option>${p.name}</option>`):['<option>Sin equipo</option>']).join('');
+  // ANTES — sistema sin compensación: usa Q bruta de cargas (r.Q)
+  const S_before  = Math.sqrt(r.P**2 + r.Q**2) || 0.001;
+  const pf_before = r.P / S_before;          // siempre LAG (cargas inductivas) → positivo
+  const I_before  = (S_before*1000) / (Math.sqrt(3)*(r.Vs||440));
+  const before={thdi:r.thdi, thdv:r.thdv, pf:+pf_before,
+    I:I_before, In:r.In, unbalV:r.unbalV, Q:r.Q, losses:r.losses_kW};
+
+  // DESPUÉS — sistema con compensación: usa Q_net (r.Q_net)
+  const S_after   = Math.sqrt(r.P**2 + r.Q_net**2) || 0.001;
+  const pf_after_mag = Math.min(0.999, r.P / S_after);
+  const pf_after  = r.Q_lead ? -pf_after_mag : +pf_after_mag;
+  const I_after   = (S_after*1000) / (Math.sqrt(3)*(r.Vs||440));
+  const after={thdi:r.thdi_c||r.thdi, thdv:r.thdv_c||r.thdv, pf:pf_after,
+    I:I_after, In:r.In_comp??r.In, unbalV:r.unbalV,
+    Q:r.Q_net, losses:r.hasComp?r.losses_kW*0.9:r.losses_kW};
+  const rows=[
+    ['THD-I (%)','thdi',1,'lower'],['THD-V (%)','thdv',2,'lower'],
+    ['Factor de Potencia','pf',3,'higher'],['Corriente RMS (A)','I',1,'lower'],
+    ['Corriente Neutro (A)','In',1,'lower'],['Desbalance V (%)','unbalV',2,'lower'],
+    ['Q reactiva (kVAR)','Q',1,'lower'],['Pérdidas (kW)','losses',2,'lower']
+  ];
+  const fmtVal=(k,v,dec)=>{
+    if(k==='pf'){ const s=v>=0?'+':''; const tag=v<0?'⚡LEAD':'LAG'; return `${s}${v.toFixed(dec)} <span style="font-size:9px;color:${v<0?'#00bcd4':'#ffc107'}">${tag}</span>`; }
+    return v.toFixed(dec);
+  };
+  const buildCol=(d)=>rows.map(([lbl,k,dec,dir])=>{
+    const v=d[k]??0; return `<div class="compare-row"><span>${lbl}</span><span style="font-weight:700">${fmtVal(k,v,dec)}</span></div>`;
+  }).join('');
+  const buildDelta=()=>rows.map(([lbl,k,dec,dir])=>{
+    const bv=before[k]??0, av=after[k]??0, d=av-bv, pct=bv?Math.abs(d/bv*100):0;
+    const good=(dir==='lower'&&d<=0)||(dir==='higher'&&d>=0);
+    const arrow=d<0?'↓':d>0?'↑':'=';
+    return `<div class="compare-row" style="justify-content:center"><span class="delta ${good?'good':'bad'}">${arrow} ${pct.toFixed(1)}%</span></div>`;
+  }).join('');
+  document.getElementById('compare-before').innerHTML=buildCol(before);
+  document.getElementById('compare-after').innerHTML=buildCol(after);
+  // Compare harmonics chart
+  const H=r.harmonics, Hc=r.harmonics_comp||H, I1=H[0]||1;
+  const idxs=[0,2,4,6,8,10,12];
+  charts.compare.data.datasets[0].data=idxs.map(n=>H[n]/I1*100);
+  charts.compare.data.datasets[1].data=idxs.map(n=>Hc[n]/I1*100);
+  charts.compare.update('none');
+  // Summary savings
+  const savedQ=(before.Q-after.Q).toFixed(1);
+  const savedLoss=((before.losses-after.losses)*1).toFixed(2);
+  const savedPct=before.thdi>0?((before.thdi-after.thdi)/before.thdi*100).toFixed(0):0;
+  const sumDiv=document.getElementById('compare-after');
+  sumDiv.innerHTML+=`<div style="margin-top:8px;background:#1b4332;border:1px solid var(--green);border-radius:4px;padding:6px;font-size:10px">
+    <div style="color:var(--green);font-weight:700;margin-bottom:4px">💰 Beneficios estimados</div>
+    <div>↓ THD-I: ${before.thdi.toFixed(1)}% → ${after.thdi.toFixed(1)}% (−${savedPct}%)</div>
+    <div>↓ Q compensada: ${savedQ} kVAR</div>
+    <div>↓ Pérdidas: ${savedLoss} kW</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ TREE ═════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderTree() {
+  const tr=SYS.transformer;
+  const c=document.getElementById('tree-container');
+  const typeIcon={
+    '3F':'🔌','2F':'🔌','1F':'🔌','capacitor':'⚡','svg_dev':'⚡','apf':'🔧','empty':'○'
+  };
+  const loadIcon={resistive:'🔥',motor_direct:'⚙️',motor_vfd:'⚙️',elevator:'🛗',led_a:'💡',led_b:'💡',led_eco:'💡',computer:'💻',ups:'🖥️',custom:'📦'};
+  c.innerHTML=`<div class="tree-node">
+    <div class="node-row ${SYS.selectedEl==='transformer'?'selected':''}" onclick="selectElement('transformer')">
+      <span class="node-icon">🔄</span><span class="node-label">TR-1 ${tr.kVA}kVA ${tr.primaryV}kV/${tr.secondaryV}V</span>
+    </div>
+    <div class="children">
+      <div class="tree-node">
+        <div class="node-row ${SYS.selectedEl==='busbar'?'selected':''}" onclick="selectElement('busbar')">
+          <span class="node-icon">═</span><span class="node-label">Barraje ${tr.secondaryV}V</span>
+          ${SYS.results?`<span class="node-badge ${SYS.results.loading<80?'on':'off'}">${SYS.results.loading.toFixed(0)}%</span>`:''}
+        </div>
+        <div class="children">
+          ${SYS.panels.map((pan,i)=>`
+          <div class="tree-node">
+            <div class="node-row ${SYS.selectedEl==='panel_'+i?'selected':''}" onclick="selectElement('panel_${i}')">
+              <span class="node-icon">${typeIcon[pan.type]||'○'}</span>
+              <span class="node-label">${pan.name}</span>
+              <span class="node-badge ${pan.enabled&&pan.type!=='empty'?'on':'off'}">${pan.enabled&&pan.type!=='empty'?'ON':'OFF'}</span>
+            </div>
+            ${pan.loads.length?`<div class="children">${pan.loads.map(l=>`<div class="node-row" style="padding-left:4px"><span class="node-icon">${loadIcon[l.type]||'📦'}</span><span class="node-label" style="color:var(--text2)">${l.name} ${l.P.toFixed(1)}kW</span></div>`).join('')}</div>`:''}
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ SIMULATE + ALERTS ════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+function simulate() {
+  SYS.engine=new SimulationEngine(SYS);
+  SYS.results=SYS.engine.run();
+  const alerts=SYS.engine.runDiagnostics(SYS.results);
+  renderAlerts(alerts);
+  drawDiagram();
+  renderTree();
+  updateCharts(SYS.results);
+  if(SYS.selectedEl) renderInspector(SYS.selectedEl);
+}
+
+function renderAlerts(alerts) {
+  const c=document.getElementById('alerts-container');
+  c.innerHTML=alerts.map(a=>`<div class="alert ${a.level}"><span>${a.level==='error'?'⛔':a.level==='warning'?'⚠️':'ℹ️'}</span><span>${a.msg}</span></div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ EXPORT ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('btn-export-json').addEventListener('click',()=>{
+  const data={transformer:{...SYS.transformer},panels:SYS.panels.map(p=>({...p,loads:[...p.loads]})),freq:SYS.freq,norm:SYS.norm};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='sistema_electrico.json'; a.click();
+});
+
+document.getElementById('btn-export-report').addEventListener('click',generateReport);
+
+function generateReport() {
+  const r=SYS.results||{};
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Informe Eléctrico</title>
+  <style>body{font-family:Arial,sans-serif;padding:20px;background:#fff}h1{color:#006064}h2{color:#0097a7}table{border-collapse:collapse;width:100%;margin:10px 0}th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}th{background:#e0f7fa}.warn{color:orange}.err{color:red}.ok{color:green}</style></head>
+  <body><h1>Informe Técnico del Sistema Eléctrico</h1>
+  <p>Fecha: ${new Date().toLocaleString()}</p>
+  <h2>Transformador</h2>
+  <table><tr><th>Parámetro</th><th>Valor</th></tr>
+  <tr><td>Potencia nominal</td><td>${SYS.transformer.kVA} kVA</td></tr>
+  <tr><td>Tensión primaria</td><td>${SYS.transformer.primaryV} kV</td></tr>
+  <tr><td>Tensión secundaria</td><td>${SYS.transformer.secondaryV} V</td></tr>
+  <tr><td>Impedancia</td><td>${SYS.transformer.Z} %</td></tr>
+  </table>
+  <h2>Resultados de Simulación</h2>
+  <table><tr><th>Magnitud</th><th>Valor</th><th>Estado</th></tr>
+  <tr><td>Potencia activa P</td><td>${r.P?.toFixed(2)||'-'} kW</td><td>—</td></tr>
+  <tr><td>Potencia reactiva Q</td><td>${r.Q?.toFixed(2)||'-'} kVAR</td><td>—</td></tr>
+  <tr><td>Factor de potencia</td><td>${r.pf_signed!=null?(r.pf_signed>=0?'+':'')+r.pf_signed.toFixed(3)+' '+(r.Q_lead?'LEAD':'LAG'):'-'}</td><td class="${r.pf>=0.9?'ok':'warn'}">${r.pf>=0.9?'OK':'Bajo'}</td></tr>
+  <tr><td>THD-I</td><td>${r.thdi?.toFixed(1)||'-'} %</td><td class="${r.thdi>5?'err':'ok'}">${r.thdi>5?'Fuera de norma':'OK'}</td></tr>
+  <tr><td>THD-V</td><td>${r.thdv?.toFixed(2)||'-'} %</td><td class="${r.thdv>5?'err':'ok'}">${r.thdv>5?'Fuera de norma':'OK'}</td></tr>
+  <tr><td>Cargabilidad Trafo</td><td>${r.loading?.toFixed(1)||'-'} %</td><td class="${r.loading>90?'err':r.loading>70?'warn':'ok'}">${r.loading>90?'Crítico':r.loading>70?'Elevado':'Normal'}</td></tr>
+  <tr><td>Corriente de neutro</td><td>${r.In?.toFixed(1)||'-'} A</td><td class="${r.In>r.I_bus*0.7?'err':'ok'}">${r.In>r.I_bus*0.7?'Excesivo':'OK'}</td></tr>
+  </table>
+  <h2>Tableros y Cargas</h2>
+  <table><tr><th>Salida</th><th>Tipo</th><th>P (kW)</th><th>FP</th><th>THD-I (%)</th></tr>
+  ${SYS.panels.map(p=>`<tr><td>${p.name}</td><td>${p.type}</td><td>${p.P.toFixed(1)}</td><td>${p.pf.toFixed(2)}</td><td>${p.thdi.toFixed(1)}</td></tr>`).join('')}
+  </table>
+  </body></html>`;
+  const w=window.open('','_blank'); w.document.write(html); w.document.close();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ GLOBAL EVENTS + INIT ═════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('btn-simulate').addEventListener('click',simulate);
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  loadCase(parseInt(document.getElementById('case-selector').value));
+  simulate();
+});
+document.getElementById('case-selector').addEventListener('change',e=>{
+  loadCase(parseInt(e.target.value)); simulate();
+});
+document.getElementById('g-freq').addEventListener('change',e=>{SYS.freq=parseInt(e.target.value);simulate();});
+document.getElementById('g-norm').addEventListener('change',e=>{SYS.norm=e.target.value;simulate();});
+document.getElementById('g-temp').addEventListener('change',e=>{SYS.tempAmb=parseInt(e.target.value);});
+
+// Chart tabs
+document.querySelectorAll('.ctab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.chart-pane').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('pane-'+tab.dataset.tab).classList.add('active');
+    // Trigger resize to fix chart rendering
+    Object.values(charts).forEach(ch=>{if(ch)ch.resize();});
+  });
+});
+
+// Waveform checkboxes
+['va','vb','vc','ia','ib','ic','in'].forEach((id,i)=>{
+  document.getElementById('chk-'+id)?.addEventListener('change',()=>{
+    if(SYS.results) updateCharts(SYS.results);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ═══ TABLET / iPAD UI ═════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function initTabletUI(){
+  const overlay = document.getElementById('panel-overlay');
+  const leftPanel  = document.getElementById('left-panel');
+  const rightPanel = document.getElementById('right-panel');
+
+  function openPanel(panel){
+    panel.classList.add('open');
+    overlay.classList.add('active');
+  }
+  function closeAll(){
+    leftPanel.classList.remove('open');
+    rightPanel.classList.remove('open');
+    overlay.classList.remove('active');
+  }
+
+  // Hamburger buttons
+  document.getElementById('btn-menu-left') .addEventListener('click', ()=> openPanel(leftPanel));
+  document.getElementById('btn-menu-right').addEventListener('click', ()=> openPanel(rightPanel));
+  document.getElementById('btn-close-left') .addEventListener('click', closeAll);
+  document.getElementById('btn-close-right').addEventListener('click', closeAll);
+  overlay.addEventListener('click', closeAll);
+
+  // When an element is selected on tablet, auto-open right panel
+  const _origSelectEl = window.selectElement;
+  window.selectElement = function(id){
+    _origSelectEl(id);
+    if(window.innerWidth <= 1180) openPanel(rightPanel);
+  };
+
+  // ── Bottom nav (portrait) ──────────────────────────────────────────────
+  const bottomPanel = document.getElementById('bottom-panel');
+  document.querySelectorAll('.bnav-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const view = btn.dataset.view;
+      closeAll();
+      if(view==='left')    openPanel(leftPanel);
+      else if(view==='right') openPanel(rightPanel);
+      else if(view==='charts'){
+        bottomPanel.style.height = '70dvh';
+        Object.values(charts).forEach(ch=>{if(ch)ch.resize();});
+      } else {
+        bottomPanel.style.height = ''; // reset to default
+      }
+    });
+  });
+
+  // ── Bottom panel drag-to-resize ────────────────────────────────────────
+  const handle = document.getElementById('bottom-resize-handle');
+  let resizing=false, startY=0, startH=0;
+
+  function onResizeStart(e){
+    resizing=true;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    startH = bottomPanel.offsetHeight;
+    document.body.style.userSelect='none';
+    e.preventDefault();
+  }
+  function onResizeMove(e){
+    if(!resizing) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const delta = startY - y;           // drag up = bigger panel
+    const newH  = Math.min(Math.max(startH+delta, 120), window.innerHeight*0.75);
+    bottomPanel.style.height = newH+'px';
+    Object.values(charts).forEach(ch=>{if(ch)ch.resize();});
+  }
+  function onResizeEnd(){ resizing=false; document.body.style.userSelect=''; }
+
+  handle.addEventListener('mousedown',  onResizeStart);
+  handle.addEventListener('touchstart', onResizeStart, {passive:false});
+  window.addEventListener('mousemove',  onResizeMove);
+  window.addEventListener('touchmove',  onResizeMove, {passive:false});
+  window.addEventListener('mouseup',    onResizeEnd);
+  window.addEventListener('touchend',   onResizeEnd);
+
+  // ── SVG pan + pinch-zoom ───────────────────────────────────────────────
+  let svgScale=1, svgPanX=0, svgPanY=0;
+  let lastTouchDist=0, panStartX=0, panStartY=0, panStartTX=0, panStartTY=0;
+
+  function applyTransform(svg){
+    svg.style.transform=`translate(${svgPanX}px,${svgPanY}px) scale(${svgScale})`;
+    svg.style.transformOrigin='0 0';
+  }
+  function getTouchDist(t){
+    const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  const diagramCont = document.getElementById('diagram-container');
+  const svgEl       = document.getElementById('diagram-svg');
+
+  diagramCont.addEventListener('touchstart', e=>{
+    if(e.touches.length===2){
+      lastTouchDist = getTouchDist(e.touches);
+      e.preventDefault();
+    } else if(e.touches.length===1){
+      panStartX  = e.touches[0].clientX;
+      panStartY  = e.touches[0].clientY;
+      panStartTX = svgPanX;
+      panStartTY = svgPanY;
+    }
+  },{passive:false});
+
+  diagramCont.addEventListener('touchmove', e=>{
+    if(e.touches.length===2){
+      const dist = getTouchDist(e.touches);
+      const factor = dist / lastTouchDist;
+      svgScale = Math.min(Math.max(svgScale*factor, 0.4), 3);
+      lastTouchDist = dist;
+      applyTransform(svgEl);
+      e.preventDefault();
+    } else if(e.touches.length===1){
+      svgPanX = panStartTX + (e.touches[0].clientX - panStartX);
+      svgPanY = panStartTY + (e.touches[0].clientY - panStartY);
+      applyTransform(svgEl);
+    }
+  },{passive:false});
+
+  // Double-tap to reset zoom
+  let lastTap=0;
+  diagramCont.addEventListener('touchend', e=>{
+    const now=Date.now();
+    if(now-lastTap<300){ svgScale=1;svgPanX=0;svgPanY=0; applyTransform(svgEl); }
+    lastTap=now;
+  });
+
+  // Mouse-wheel zoom (laptop trackpad on iPad external keyboard)
+  diagramCont.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const factor = e.deltaY<0 ? 1.1 : 0.9;
+    svgScale = Math.min(Math.max(svgScale*factor, 0.4), 3);
+    applyTransform(svgEl);
+  },{passive:false});
+
+  // ── Resize observer → redraw diagram + charts ──────────────────────────
+  const ro = new ResizeObserver(()=>{
+    drawDiagram();
+    Object.values(charts).forEach(ch=>{if(ch)ch.resize();});
+  });
+  ro.observe(document.getElementById('center-panel'));
+
+})();
+
+// Boot
+window.addEventListener('load',()=>{
+  initCharts();
+  loadCase(0);
+  simulate();
+});
+</script>
+</body>
+</html>
